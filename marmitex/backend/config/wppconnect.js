@@ -1,34 +1,55 @@
-import { create } from '@wppconnect-team/wppconnect';
+// backend/config/wppconnect.js
+import wppconnect from '@wppconnect-team/wppconnect';
+import fs from 'fs';
 
-export async function conectarWhatsapp(onMessageReceived) {
-  return await create({
-    session: 'marmitex-bot',
-    headless: false, // Mantém o navegador visível
-    waitForLogin: true, // Espera login completo
-    deleteSessionOnLogout: true, // Limpa sessão antiga ao sair
-    autoClose: 0,
-    catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
-      console.log('⚠️ Escaneie o QR Code no WhatsApp:');
-      console.log(asciiQR);
+const SESSAO = 'marmitex-bot';
+const TOKEN_PATH = `./tokens/${SESSAO}/token.json`;
+
+export async function conectarWhatsapp(callbackOnMessage) {
+  const tokenSalvo = carregarToken();
+
+  const client = await wppconnect.create({
+    session: SESSAO,
+    headless: false,
+    autoClose: false,
+    browserArgs: ['--no-sandbox'],
+    catchQR: (base64Qrimg, asciiQR, attempts, urlCode) => {
+      console.log('⚠️ Escaneie o QR Code no WhatsApp:\n', asciiQR);
     },
     statusFind: (statusSession, session) => {
       console.log(`💬 Status da sessão (${session}):`, statusSession);
     },
-    puppeteerOptions: {
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1280,800',
-      ],
-    },
-  }).then((client) => {
-    console.log('✅ Conectado ao WhatsApp!');
-    client.onMessage(onMessageReceived);
-    return client;
-  }).catch((error) => {
-    console.error('❌ Erro ao iniciar conexão com WhatsApp:', error);
+    browserSessionToken: tokenSalvo ?? undefined,
+    disableWelcome: true,
+    updatesLog: false
+  });
+
+  console.log('✅ Conectado ao WhatsApp!');
+
+  salvarToken(client);
+
+  // Escuta mensagens
+  client.onMessage(callbackOnMessage);
+
+  return client;
+}
+
+function carregarToken() {
+  try {
+    const raw = fs.readFileSync(TOKEN_PATH, 'utf-8');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function salvarToken(client) {
+  client.onStreamChange(async (state) => {
+    if (state === 'CONNECTED') {
+      const token = await client.getSessionTokenBrowser();
+      fs.mkdirSync('./tokens/marmitex-bot', { recursive: true });
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(token), 'utf-8');
+      console.log('💾 Token de sessão salvo!');
+    }
   });
 }

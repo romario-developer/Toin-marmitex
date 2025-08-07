@@ -1,5 +1,6 @@
 import express from 'express';
-import { criarCardapio, obterCardapioDeHoje } from '../controllers/cardapioController.js';
+import { salvarCardapio as criarCardapio, obterCardapioAtual as obterCardapioDeHoje } from '../controllers/cardapioController.js';
+
 
 const router = express.Router();
 
