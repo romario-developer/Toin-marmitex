@@ -1,0 +1,17 @@
+# Ignorar dependências e ambientes
+node_modules/
+.env
+dist/
+
+# Ignorar arquivos do Puppeteer / Chrome / Tokens
+marmitex/backend/tokens/
+**/Cache/
+**/Cache_Data/
+**/DawnGraphiteCache/
+**/GPUCache/
+*.log
+
+# Outros
+.vscode/
+.DS_Store
+*.bak
