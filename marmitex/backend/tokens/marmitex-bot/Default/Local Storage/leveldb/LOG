@@ -1,6 +1,2 @@
-2025/08/07-02:23:56.031 4bf0 Reusing MANIFEST C:\Projetos\marmitex\backend\tokens\marmitex-bot\Default\Local Storage\leveldb/MANIFEST-000001
-2025/08/07-02:23:56.077 4bf0 Recovering log #3
-2025/08/07-02:23:56.085 4bf0 Reusing old log C:\Projetos\marmitex\backend\tokens\marmitex-bot\Default\Local Storage\leveldb/000003.log 
-2025/08/07-02:25:56.303 449c Level-0 table #5: started
-2025/08/07-02:25:56.315 449c Level-0 table #5: 18641 bytes OK
-2025/08/07-02:25:56.318 449c Delete type=0 #3
+2025/08/07-16:58:33.979 20b0 Creating DB C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\tokens\marmitex-bot\Default\Local Storage\leveldb since it was missing.
+2025/08/07-16:58:34.001 20b0 Reusing MANIFEST C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\tokens\marmitex-bot\Default\Local Storage\leveldb/MANIFEST-000001

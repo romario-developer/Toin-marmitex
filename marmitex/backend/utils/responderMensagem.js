@@ -3,6 +3,11 @@ import { conversasAtivas, resetarConversa } from './conversasAtivas.js';
 import { obterCardapioAtual } from '../controllers/cardapioController.js';
 
 export async function responderMensagem(client, message) {
+  if (!message || !message.from || !message.body) {
+    console.error('❌ Mensagem inválida recebida:', message);
+    return;
+  }
+
   const numero = message.from;
   const texto = message.body?.toLowerCase().trim();
 

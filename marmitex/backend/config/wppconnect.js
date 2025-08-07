@@ -1,4 +1,4 @@
-// backend/config/wppconnect.js
+
 import wppconnect from '@wppconnect-team/wppconnect';
 import fs from 'fs';
 

@@ -1,3 +1,2 @@
-2025/08/07-02:23:55.922 32a8 Reusing MANIFEST C:\Projetos\marmitex\backend\tokens\marmitex-bot\Default\shared_proto_db\metadata/MANIFEST-000001
-2025/08/07-02:23:55.923 32a8 Recovering log #3
-2025/08/07-02:23:55.923 32a8 Reusing old log C:\Projetos\marmitex\backend\tokens\marmitex-bot\Default\shared_proto_db\metadata/000003.log 
+2025/08/07-16:58:34.072 3094 Creating DB C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\tokens\marmitex-bot\Default\shared_proto_db\metadata since it was missing.
+2025/08/07-16:58:34.080 3094 Reusing MANIFEST C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\tokens\marmitex-bot\Default\shared_proto_db\metadata/MANIFEST-000001
