@@ -6,7 +6,9 @@ import simulador from './routes/simulador.js';
 import { iniciarBot } from './services/whatsappBot.js';
 import cardapioRoutes from './routes/cardapios.js';
 
+
 dotenv.config();
+console.log('🧪 MODO_TESTE:', process.env.MODO_TESTE);
 
 const app = express();
 const PORT = process.env.PORT || 5000;
