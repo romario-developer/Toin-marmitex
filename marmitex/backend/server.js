@@ -6,7 +6,7 @@ import simulador from './routes/simulador.js';
 import { iniciarBot } from './services/whatsappBot.js';
 import cardapioRoutes from './routes/cardapios.js';
 import pedidoRoutes from './routes/pedidos.js';
-
+import configuracoesRoutes from './routes/configuracoes.js';
 
 
 dotenv.config();
@@ -20,6 +20,7 @@ app.use(express.json());
 
 app.use('/api/cardapios', cardapioRoutes);
 app.use('/api/pedidos', pedidoRoutes);
+app.use('/api/configuracoes', configuracoesRoutes);
 
 if (process.env.MODO_TESTE === 'true') {
   app.use('/api/simular', simulador);

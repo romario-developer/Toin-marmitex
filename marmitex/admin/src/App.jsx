@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import CadastroCardapio from './components/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
+import Configuracoes from './pages/Configuracoes';
 
 function App() {
   return (
@@ -20,11 +21,19 @@ function App() {
           >
             Pedidos Recebidos
           </Link>
+          <Link
+  to="/configuracoes"
+  className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 transition"
+>
+  Configurações
+</Link>
+
         </nav>
 
         <Routes>
           <Route path="/" element={<CadastroCardapio />} />
           <Route path="/pedidos" element={<Pedidos />} />
+          <Route path="/configuracoes" element={<Configuracoes />} /> {/* ✅ aqui */}
         </Routes>
       </div>
     </Router>
