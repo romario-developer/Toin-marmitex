@@ -2,7 +2,7 @@
 import wppconnect from '@wppconnect-team/wppconnect';
 import fs from 'fs';
 
-const SESSAO = 'marmitex-bot';
+const SESSAO = 'marmitex-teste';
 const TOKEN_PATH = `./tokens/${SESSAO}/token.json`;
 
 export async function conectarWhatsapp(callbackOnMessage) {
@@ -11,7 +11,7 @@ export async function conectarWhatsapp(callbackOnMessage) {
   const client = await wppconnect.create({
     session: SESSAO,
     headless: false,
-    autoClose: false,
+    autoClose: 0,
     browserArgs: ['--no-sandbox'],
     catchQR: (base64Qrimg, asciiQR, attempts, urlCode) => {
       console.log('⚠️ Escaneie o QR Code no WhatsApp:\n', asciiQR);
@@ -23,6 +23,21 @@ export async function conectarWhatsapp(callbackOnMessage) {
     disableWelcome: true,
     updatesLog: false
   });
+
+  client.onStateChange((state) => {
+  console.log('📡 State changed:', state);
+  if (state === 'CONFLICT') {
+    console.log('⚠️ CONFLITO! Forçando uso aqui...');
+    client.useHere();
+  }
+  if (state === 'UNPAIRED') {
+    console.log('🚫 Sessão desvinculada do WhatsApp!');
+  }
+  if (state === 'UNLAUNCHED') {
+    console.log('⚠️ Cliente não iniciou corretamente');
+  }
+});
+
 
   console.log('✅ Conectado ao WhatsApp!');
 
