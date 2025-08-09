@@ -1,13 +1,13 @@
-// backend/services/whatsappBot.js
 import wppconnect from '@wppconnect-team/wppconnect';
 import dotenv from 'dotenv';
 import Pedido from '../models/Pedido.js';
 import Configuracao from '../models/Configuracao.js';
+import Cardapio from '../models/Cardapio.js';
 
 dotenv.config();
 
 // ===== Memória p/ simulador =====
-const conversas = {}; // { from: [ { who:'user'|'bot', text, at } ] }
+const conversas = {};
 function pushMsg(from, who, text) {
   if (!conversas[from]) conversas[from] = [];
   conversas[from].push({ who, text, at: Date.now() });
@@ -44,6 +44,24 @@ async function getConfig() {
   cacheAt = now;
   return cacheConfig;
 }
+
+async function getCardapioHoje() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const amanha = new Date(hoje); amanha.setDate(amanha.getDate() + 1);
+
+  // tenta hoje
+  let c = await Cardapio.findOne({ data: { $gte: hoje, $lt: amanha } });
+  if (c) return { cardapio: c, fonte: 'hoje' };
+
+  // fallback: pega o mais recente cadastrado
+  c = await Cardapio.findOne().sort({ data: -1 });
+  if (c) {
+    console.warn('⚠️ Nenhum cardápio para hoje. Usando o mais recente cadastrado.');
+    return { cardapio: c, fonte: 'ultimo' };
+  }
+  return { cardapio: null, fonte: 'nenhum' };
+}
+
 
 function moeda(v) {
   const n = Number(v ?? 0);
@@ -99,10 +117,30 @@ async function processarMensagem(client, msg, simulado = false) {
   };
 
   switch (sessao.etapa) {
-    case 'inicio':
-      await enviar('Olá! Seja bem-vindo ao marmitex. Digite 1 para o CARDÁPIO 1 ou 2 para o CARDÁPIO 2.');
-      sessao.etapa = 'cardapio';
-      break;
+  case 'inicio': {
+  const { cardapio: c } = await getCardapioHoje();
+  if (c) {
+    const c1 = c.cardapio1?.descricao || '';
+    const c2 = c.cardapio2?.descricao || '';
+    await enviar(
+      'Olá! Seja bem-vindo ao marmitex!\n\n' +
+      'Digite o numero da opção desejada:\n' +
+      `1. CARDÁPIO 1 : ${c1}\n` +
+      `2. CARDÁPIO 2. ${c2}`
+    );
+  } else {
+    await enviar(
+      'Olá! Seja bem-vindo ao marmitex!\n\n' +
+      'Digite o numero da opção desejada:\n' +
+      '1. CARDÁPIO 1\n' +
+      '2. CARDÁPIO 2'
+    );
+  }
+  sessao.etapa = 'cardapio';
+  break;
+}
+
+
 
     case 'cardapio':
       if (texto === '1' || texto === '2') {

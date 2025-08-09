@@ -5,10 +5,10 @@ const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function CadastroCardapio() {
   const [data, setData] = useState(() => new Date().toISOString().substring(0, 10));
-  const [card1Prato, setCard1Prato] = useState('');
-  const [card1Acomp, setCard1Acomp] = useState('');
-  const [card2Prato, setCard2Prato] = useState('');
-  const [card2Acomp, setCard2Acomp] = useState('');
+  const [c1Tipo, setC1Tipo] = useState('');
+  const [c1Desc, setC1Desc] = useState('');
+  const [c2Tipo, setC2Tipo] = useState('');
+  const [c2Desc, setC2Desc] = useState('');
   const [msg, setMsg] = useState('');
 
   async function salvar(e) {
@@ -16,22 +16,16 @@ export default function CadastroCardapio() {
     setMsg('');
     try {
       const payload = {
-        data, // yyyy-mm-dd
-        cardapio1: {
-          prato: card1Prato,
-          acompanhamentos: card1Acomp.split(',').map(s => s.trim()).filter(Boolean)
-        },
-        cardapio2: {
-          prato: card2Prato,
-          acompanhamentos: card2Acomp.split(',').map(s => s.trim()).filter(Boolean)
-        }
+        data,
+        cardapio1: { tipo: c1Tipo, descricao: c1Desc },
+        cardapio2: { tipo: c2Tipo, descricao: c2Desc }
       };
       await axios.post(`${API}/api/cardapios`, payload);
       setMsg('✅ Cardápio salvo com sucesso!');
-      setCard1Prato(''); setCard1Acomp(''); setCard2Prato(''); setCard2Acomp('');
+      setC1Tipo(''); setC1Desc(''); setC2Tipo(''); setC2Desc('');
     } catch (err) {
-      setMsg('❌ Erro ao salvar cardápio.');
       console.error(err);
+      setMsg('❌ Erro ao salvar cardápio.');
     }
   }
 
@@ -53,21 +47,23 @@ export default function CadastroCardapio() {
       <h2 className="mt-4 font-semibold">Cardápio 1</h2>
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Prato</label>
+          <label className="block text-sm font-medium mb-1">Tipo</label>
           <input
             className="w-full border rounded px-3 py-2"
-            value={card1Prato}
-            onChange={e => setCard1Prato(e.target.value)}
+            placeholder="Ex.: Tradicional, Fit, Executivo"
+            value={c1Tipo}
+            onChange={e => setC1Tipo(e.target.value)}
             required
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Acompanhamentos (separe por vírgula)</label>
-          <input
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">Descrição</label>
+          <textarea
             className="w-full border rounded px-3 py-2"
-            placeholder="Arroz, Feijão, Salada"
-            value={card1Acomp}
-            onChange={e => setCard1Acomp(e.target.value)}
+            placeholder="Ex.: Frango grelhado, arroz, feijão, salada"
+            rows={3}
+            value={c1Desc}
+            onChange={e => setC1Desc(e.target.value)}
             required
           />
         </div>
@@ -76,21 +72,23 @@ export default function CadastroCardapio() {
       <h2 className="mt-4 font-semibold">Cardápio 2</h2>
       <div className="grid md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Prato</label>
+          <label className="block text-sm font-medium mb-1">Tipo</label>
           <input
             className="w-full border rounded px-3 py-2"
-            value={card2Prato}
-            onChange={e => setCard2Prato(e.target.value)}
+            placeholder="Ex.: Tradicional, Fit, Executivo"
+            value={c2Tipo}
+            onChange={e => setC2Tipo(e.target.value)}
             required
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Acompanhamentos (separe por vírgula)</label>
-          <input
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium mb-1">Descrição</label>
+          <textarea
             className="w-full border rounded px-3 py-2"
-            placeholder="Arroz, Farofa, Batata"
-            value={card2Acomp}
-            onChange={e => setCard2Acomp(e.target.value)}
+            placeholder="Ex.: Carne de panela, arroz, farofa, batata"
+            rows={3}
+            value={c2Desc}
+            onChange={e => setC2Desc(e.target.value)}
             required
           />
         </div>

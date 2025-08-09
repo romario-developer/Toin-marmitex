@@ -31,6 +31,25 @@ export default function SimuladorWhatsApp() {
     await carregar();
   }
 
+  // 🔹 NOVO: mostrar cardápio do dia como mensagem do "bot"
+  async function mostrarCardapioHoje() {
+  try {
+    const { data } = await axios.get(`${API}/api/cardapios/hoje`);
+    const c1 = data.cardapio1?.descricao || '';
+    const c2 = data.cardapio2?.descricao || '';
+    const texto =
+      'Olá! Seja bem-vindo ao marmitex!\n\n' +
+      'Digite o numero da opção desejada:\n' +
+      `1. CARDÁPIO 1 : ${c1}\n` +
+      `2. CARDÁPIO 2. ${c2}`;
+    setMensagens(prev => [...prev, { who: 'bot', text: texto, at: Date.now() }]);
+    setTimeout(() => scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }), 50);
+  } catch {
+    setMensagens(prev => [...prev, { who: 'bot', text: 'Nenhum cardápio encontrado para hoje.', at: Date.now() }]);
+  }
+}
+
+
   useEffect(() => {
     carregar();
   }, [from]);
@@ -55,8 +74,8 @@ export default function SimuladorWhatsApp() {
     <div className="p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">💬 Simulador de Conversa (WhatsApp - Teste)</h1>
 
-      <div className="flex gap-2 mb-3 items-end">
-        <div className="flex-1">
+      <div className="flex gap-2 mb-3 items-end flex-wrap">
+        <div className="flex-1 min-w-[220px]">
           <label className="block text-sm font-medium mb-1">Número (from)</label>
           <input
             className="w-full border rounded px-3 py-2"
@@ -69,6 +88,12 @@ export default function SimuladorWhatsApp() {
           className="h-10 px-4 bg-red-600 text-white rounded hover:bg-red-700"
         >
           Limpar conversa
+        </button>
+        <button
+          onClick={mostrarCardapioHoje}
+          className="h-10 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+        >
+          Cardápio de hoje
         </button>
         <label className="flex items-center gap-2">
           <input
@@ -85,7 +110,7 @@ export default function SimuladorWhatsApp() {
         className="bg-[#e5ddd5] rounded-lg p-3 h-[60vh] overflow-y-auto border"
       >
         {mensagens.length === 0 && (
-          <div className="text-center text-sm text-gray-600">Sem mensagens. Envie "oi" para iniciar.</div>
+          <div className="text-center text-sm text-gray-600">Sem mensagens. Envie "oi" ou clique em “Cardápio de hoje”.</div>
         )}
 
         {mensagens.map((m, i) => (
