@@ -1,3 +1,4 @@
+// backend/services/whatsappBot.js
 import wppconnect from '@wppconnect-team/wppconnect';
 import dotenv from 'dotenv';
 import Pedido from '../models/Pedido.js';
@@ -5,14 +6,8 @@ import Configuracao from '../models/Configuracao.js';
 
 dotenv.config();
 
-const sessoes = {};
-// 👇 memória de conversas apenas pro modo teste
-const conversas = {}; // { from: [ { who:'user'|'bot', text:string, at:number } ] }
-
-let cacheConfig = null;
-let cacheAt = 0;
-const CACHE_MS = 60_000; // 1 min
-
+// ===== Memória p/ simulador =====
+const conversas = {}; // { from: [ { who:'user'|'bot', text, at } ] }
 function pushMsg(from, who, text) {
   if (!conversas[from]) conversas[from] = [];
   conversas[from].push({ who, text, at: Date.now() });
@@ -24,15 +19,22 @@ export function resetConversa(from) {
   conversas[from] = [];
 }
 
+// ===== Estado do bot =====
+const sessoes = {};
+let cacheConfig = null;
+let cacheAt = 0;
+const CACHE_MS = 60_000;
+
+// ===== Config / helpers =====
 async function getConfig() {
   const now = Date.now();
   if (cacheConfig && (now - cacheAt) < CACHE_MS) return cacheConfig;
-
   const cfg = await Configuracao.findOne();
   if (!cfg) {
     cacheConfig = {
       precosMarmita: { P: 15, M: 20, G: 25 },
-      precosBebida: { lata: 5, umLitro: 8, doisLitros: 12 }
+      precosBebida: { lata: 5, umLitro: 8, doisLitros: 12 },
+      taxaEntrega: 3
     };
     cacheAt = now;
     console.warn('⚠️ Nenhuma configuração encontrada. Usando preços padrão.');
@@ -70,6 +72,156 @@ function mensagemBebidas(cfg) {
     `3. Coca 2L (${moeda(dois)})`
   );
 }
+function mensagemEntrega(cfg) {
+  const taxa = cfg.taxaEntrega ?? 0;
+  return (
+    'Entrega ou retirar no local?\n' +
+    `1. Entrega (+${moeda(taxa)})\n` +
+    '2. Retirar no local'
+  );
+}
+
+// ===== Core =====
+async function processarMensagem(client, msg, simulado = false) {
+  const texto = msg.body?.toLowerCase()?.trim();
+  const remetente = msg.from;
+
+  if (!sessoes[remetente]) sessoes[remetente] = { etapa: 'inicio' };
+  const sessao = sessoes[remetente];
+
+  const enviar = async (mensagem) => {
+    if (simulado) {
+      console.log(`💬 [Simulado] Para ${remetente}: ${mensagem}`);
+      pushMsg(remetente, 'bot', mensagem);
+    } else {
+      await client.sendText(remetente, mensagem);
+    }
+  };
+
+  switch (sessao.etapa) {
+    case 'inicio':
+      await enviar('Olá! Seja bem-vindo ao marmitex. Digite 1 para o CARDÁPIO 1 ou 2 para o CARDÁPIO 2.');
+      sessao.etapa = 'cardapio';
+      break;
+
+    case 'cardapio':
+      if (texto === '1' || texto === '2') {
+        sessao.finalizacao = { cardapio: `CARDÁPIO ${texto}` };
+        const cfg1 = await getConfig();
+        await enviar(mensagemTamanhos(cfg1));
+        sessao.etapa = 'tamanho';
+      } else {
+        await enviar('Por favor, digite 1 ou 2 para escolher o cardápio.');
+      }
+      break;
+
+    case 'tamanho':
+      if (['p', 'm', 'g'].includes(texto)) {
+        sessao.finalizacao.tamanho = texto.toUpperCase();
+        await enviar('Deseja bebida? Digite "sim" ou "não".');
+        sessao.etapa = 'bebida';
+      } else {
+        const cfg2 = await getConfig();
+        await enviar('Tamanho inválido.\n\n' + mensagemTamanhos(cfg2));
+      }
+      break;
+
+    case 'bebida':
+      if (texto === 'não' || texto === 'nao') {
+        sessao.finalizacao.bebida = 'Nenhuma';
+        const cfg3 = await getConfig();
+        await enviar(mensagemEntrega(cfg3));
+        sessao.etapa = 'entrega';
+      } else if (texto === 'sim') {
+        sessao.etapa = 'escolher-bebida';
+        const cfg4 = await getConfig();
+        await enviar(mensagemBebidas(cfg4));
+      } else {
+        await enviar('Por favor, responda com "sim" ou "não".');
+      }
+      break;
+
+    case 'escolher-bebida':
+      if (['1', '2', '3'].includes(texto)) {
+        const bebidas = { '1': 'Coca Lata', '2': 'Coca 1L', '3': 'Coca 2L' };
+        sessao.finalizacao.bebida = bebidas[texto];
+        const cfg5 = await getConfig();
+        await enviar(mensagemEntrega(cfg5));
+        sessao.etapa = 'entrega';
+      } else {
+        const cfg6 = await getConfig();
+        await enviar('Escolha inválida. Digite 1, 2 ou 3.\n\n' + mensagemBebidas(cfg6));
+      }
+      break;
+
+    case 'entrega':
+      if (['1', '2'].includes(texto)) {
+        const cfg7 = await getConfig();
+        if (texto === '1') {
+          sessao.finalizacao.tipoEntrega = 'Entrega';
+          sessao.finalizacao.taxaEntrega = Number(cfg7.taxaEntrega ?? 0);
+        } else {
+          sessao.finalizacao.tipoEntrega = 'Retirar';
+          sessao.finalizacao.taxaEntrega = 0;
+        }
+        await enviar('Escolha a forma de pagamento:\n1. Dinheiro\n2. PIX\n3. Cartão');
+        sessao.etapa = 'pagamento';
+      } else {
+        const cfg8 = await getConfig();
+        await enviar('Opção inválida.\n\n' + mensagemEntrega(cfg8));
+      }
+      break;
+
+    case 'pagamento':
+      if (['1', '2', '3'].includes(texto)) {
+        const formas = { '1': 'Dinheiro', '2': 'PIX', '3': 'Cartão' };
+        sessao.finalizacao.pagamento = formas[texto];
+
+        const cfg = await getConfig();
+        const precos = cfg.precosMarmita;
+        const bebidaPrecoMap = {
+          'Nenhuma': 0,
+          'Coca Lata': Number(cfg.precosBebida?.lata ?? 0),
+          'Coca 1L': Number(cfg.precosBebida?.umLitro ?? 0),
+          'Coca 2L': Number(cfg.precosBebida?.doisLitros ?? 0),
+        };
+
+        const base = Number(precos[sessao.finalizacao.tamanho] ?? 0);
+        const adicional = bebidaPrecoMap[sessao.finalizacao.bebida] ?? 0;
+        const taxa = Number(sessao.finalizacao.taxaEntrega ?? 0);
+        const total = base + adicional + taxa;
+
+        sessao.finalizacao.total = total;
+
+        await enviar(
+          `🧾 Resumo do pedido:\n` +
+          `🍱 ${sessao.finalizacao.cardapio}\n` +
+          `📏 Tamanho: ${sessao.finalizacao.tamanho} (${moeda(base)})\n` +
+          `🥤 Bebida: ${sessao.finalizacao.bebida} (${moeda(adicional)})\n` +
+          (taxa > 0 ? `🚚 Entrega: ${moeda(taxa)}\n` : `🏬 Retirada no local\n`) +
+          `💰 Total: ${moeda(total)}\n` +
+          `Pagamento: ${sessao.finalizacao.pagamento}`
+        );
+
+        await enviar('✅ Pedido confirmado! Sua marmita está sendo preparada.');
+        await salvarPedido(sessao.finalizacao, remetente, msg.sender?.pushname);
+        delete sessoes[remetente];
+      } else {
+        await enviar('Escolha inválida. Digite 1, 2 ou 3.');
+      }
+      break;
+
+    default:
+      await enviar('Não entendi. Por favor, digite "oi" para começar.');
+      delete sessoes[remetente];
+  }
+}
+
+// ===== APIs expostas =====
+export async function handleMensagemSimulada({ from, body }) {
+  pushMsg(from, 'user', body);
+  await processarMensagem(null, { from, body, sender: { pushname: 'Teste Simulado' } }, true);
+}
 
 export async function iniciarBot() {
   wppconnect.create({
@@ -91,131 +243,7 @@ export async function iniciarBot() {
   });
 }
 
-export async function handleMensagemSimulada({ from, body }) {
-  // guarda a mensagem do usuário na conversa de teste
-  pushMsg(from, 'user', body);
-  await processarMensagem(null, { from, body, sender: { pushname: 'Teste Simulado' } }, true);
-}
-
-async function processarMensagem(client, msg, simulado = false) {
-  const texto = msg.body?.toLowerCase()?.trim();
-  const remetente = msg.from;
-
-  if (!sessoes[remetente]) {
-    sessoes[remetente] = { etapa: 'inicio' };
-  }
-  const sessao = sessoes[remetente];
-
-  const enviar = async (mensagem) => {
-    if (simulado) {
-      console.log(`💬 [Simulado] Para ${remetente}: ${mensagem}`);
-      pushMsg(remetente, 'bot', mensagem);
-    } else {
-      await client.sendText(remetente, mensagem);
-    }
-  };
-
-  switch (sessao.etapa) {
-    case 'inicio':
-      await enviar('Olá! Seja bem-vindo ao marmitex. Digite 1 para o CARDÁPIO 1 ou 2 para o CARDÁPIO 2.');
-      sessao.etapa = 'cardapio';
-      break;
-
-    case 'cardapio':
-      if (texto === '1' || texto === '2') {
-        sessao.finalizacao = { cardapio: `CARDÁPIO ${texto}` };
-        try {
-          const cfg = await getConfig();
-          await enviar(mensagemTamanhos(cfg));
-        } catch {
-          await enviar('Qual o tamanho da marmita? (P, M ou G)');
-        }
-        sessao.etapa = 'tamanho';
-      } else {
-        await enviar('Por favor, digite 1 ou 2 para escolher o cardápio.');
-      }
-      break;
-
-    case 'tamanho':
-      if (['p', 'm', 'g'].includes(texto)) {
-        sessao.finalizacao.tamanho = texto.toUpperCase();
-        await enviar('Deseja bebida? Digite "sim" ou "não".');
-        sessao.etapa = 'bebida';
-      } else {
-        const cfg = await getConfig();
-        await enviar('Tamanho inválido.\n\n' + mensagemTamanhos(cfg));
-      }
-      break;
-
-    case 'bebida':
-      if (texto === 'não' || texto === 'nao') {
-        sessao.finalizacao.bebida = 'Nenhuma';
-        sessao.etapa = 'pagamento';
-        await enviar('Escolha a forma de pagamento:\n1. Dinheiro\n2. PIX\n3. Cartão');
-      } else if (texto === 'sim') {
-        sessao.etapa = 'escolher-bebida';
-        const cfg = await getConfig();
-        await enviar(mensagemBebidas(cfg));
-      } else {
-        await enviar('Por favor, responda com "sim" ou "não".');
-      }
-      break;
-
-    case 'escolher-bebida':
-      if (['1', '2', '3'].includes(texto)) {
-        const bebidas = { '1': 'Coca Lata', '2': 'Coca 1L', '3': 'Coca 2L' };
-        sessao.finalizacao.bebida = bebidas[texto];
-        sessao.etapa = 'pagamento';
-        await enviar('Escolha a forma de pagamento:\n1. Dinheiro\n2. PIX\n3. Cartão');
-      } else {
-        const cfg = await getConfig();
-        await enviar('Escolha inválida. Digite 1, 2 ou 3.\n\n' + mensagemBebidas(cfg));
-      }
-      break;
-
-    case 'pagamento':
-      if (['1', '2', '3'].includes(texto)) {
-        const formas = { '1': 'Dinheiro', '2': 'PIX', '3': 'Cartão' };
-        sessao.finalizacao.pagamento = formas[texto];
-
-        const cfg = await getConfig();
-        const precos = cfg.precosMarmita; // {P,M,G}
-        const bebidaPrecoMap = {
-          'Nenhuma': 0,
-          'Coca Lata': Number(cfg.precosBebida?.lata ?? 0),
-          'Coca 1L': Number(cfg.precosBebida?.umLitro ?? 0),
-          'Coca 2L': Number(cfg.precosBebida?.doisLitros ?? 0),
-        };
-
-        const base = Number(precos[sessao.finalizacao.tamanho] ?? 0);
-        const adicional = bebidaPrecoMap[sessao.finalizacao.bebida] ?? 0;
-        const total = base + adicional;
-
-        sessao.finalizacao.total = total;
-
-        await enviar(
-          `🧾 Resumo do pedido:\n` +
-          `🍱 ${sessao.finalizacao.cardapio}\n` +
-          `📏 Tamanho: ${sessao.finalizacao.tamanho} (${moeda(base)})\n` +
-          `🥤 Bebida: ${sessao.finalizacao.bebida} (${moeda(adicional)})\n` +
-          `💰 Total: ${moeda(total)}\n` +
-          `Forma de pagamento: ${sessao.finalizacao.pagamento}`
-        );
-
-        await enviar('✅ Pedido confirmado! Sua marmita está sendo preparada.');
-        await salvarPedido(sessao.finalizacao, remetente, msg.sender?.pushname);
-        delete sessoes[remetente];
-      } else {
-        await enviar('Escolha inválida. Digite 1, 2 ou 3.');
-      }
-      break;
-
-    default:
-      await enviar('Não entendi. Por favor, digite "oi" para começar.');
-      delete sessoes[remetente];
-  }
-}
-
+// ===== Persistência =====
 async function salvarPedido(finalizacao, remetente, nome = '') {
   try {
     const novo = new Pedido({
@@ -224,6 +252,8 @@ async function salvarPedido(finalizacao, remetente, nome = '') {
       tamanho: finalizacao.tamanho,
       bebida: finalizacao.bebida,
       formaPagamento: finalizacao.pagamento,
+      tipoEntrega: finalizacao.tipoEntrega || 'Entrega',
+      taxaEntrega: finalizacao.taxaEntrega || 0,
       total: finalizacao.total,
     });
     await novo.save();

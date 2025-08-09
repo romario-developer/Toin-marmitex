@@ -10,6 +10,10 @@ const configuracaoSchema = new mongoose.Schema({
     lata: Number,
     umLitro: Number,
     doisLitros: Number,
+  },
+  taxaEntrega: {
+    type: Number,
+    default: 3
   }
 });
 

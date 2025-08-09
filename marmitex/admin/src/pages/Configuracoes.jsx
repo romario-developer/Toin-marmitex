@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function Configuracoes() {
   const [precos, setPrecos] = useState({
     precosMarmita: { P: '', M: '', G: '' },
-    precosBebida: { lata: '', umLitro: '', doisLitros: '' }
+    precosBebida: { lata: '', umLitro: '', doisLitros: '' },
+    taxaEntrega: 3
   });
 
   const [salvando, setSalvando] = useState(false);
@@ -13,8 +16,12 @@ export default function Configuracoes() {
   useEffect(() => {
     async function carregar() {
       try {
-        const res = await axios.get('http://localhost:5000/api/configuracoes');
-        setPrecos(res.data);
+        const res = await axios.get(`${API}/api/configuracoes`);
+        setPrecos({
+          precosMarmita: res.data.precosMarmita || { P: '', M: '', G: '' },
+          precosBebida: res.data.precosBebida || { lata: '', umLitro: '', doisLitros: '' },
+          taxaEntrega: res.data.taxaEntrega ?? 3
+        });
       } catch {
         console.log('Configuração ainda não criada.');
       }
@@ -26,9 +33,9 @@ export default function Configuracoes() {
     setSalvando(true);
     setMensagem('');
     try {
-      await axios.post('http://localhost:5000/api/configuracoes', precos);
+      await axios.post(`${API}/api/configuracoes`, precos);
       setMensagem('✅ Configuração salva com sucesso!');
-    } catch (err) {
+    } catch {
       setMensagem('❌ Erro ao salvar configuração.');
     } finally {
       setSalvando(false);
@@ -52,7 +59,7 @@ export default function Configuracoes() {
                 onChange={(e) =>
                   setPrecos((prev) => ({
                     ...prev,
-                    precosMarmita: { ...prev.precosMarmita, [tamanho]: e.target.value }
+                    precosMarmita: { ...prev.precosMarmita, [tamanho]: Number(e.target.value) }
                   }))
                 }
               />
@@ -71,7 +78,7 @@ export default function Configuracoes() {
               onChange={(e) =>
                 setPrecos((prev) => ({
                   ...prev,
-                  precosBebida: { ...prev.precosBebida, lata: e.target.value }
+                  precosBebida: { ...prev.precosBebida, lata: Number(e.target.value) }
                 }))
               }
             />
@@ -85,7 +92,7 @@ export default function Configuracoes() {
               onChange={(e) =>
                 setPrecos((prev) => ({
                   ...prev,
-                  precosBebida: { ...prev.precosBebida, umLitro: e.target.value }
+                  precosBebida: { ...prev.precosBebida, umLitro: Number(e.target.value) }
                 }))
               }
             />
@@ -99,12 +106,23 @@ export default function Configuracoes() {
               onChange={(e) =>
                 setPrecos((prev) => ({
                   ...prev,
-                  precosBebida: { ...prev.precosBebida, doisLitros: e.target.value }
+                  precosBebida: { ...prev.precosBebida, doisLitros: Number(e.target.value) }
                 }))
               }
             />
           </div>
         </div>
+      </div>
+
+      <div className="mt-6 max-w-md">
+        <h2 className="text-lg font-semibold mb-2">🚚 Taxa de Entrega</h2>
+        <input
+          type="number"
+          className="w-full border px-3 py-2 rounded"
+          value={precos.taxaEntrega}
+          onChange={(e) => setPrecos((prev) => ({ ...prev, taxaEntrega: Number(e.target.value) }))}
+        />
+        <p className="text-sm text-gray-600 mt-1">Valor fixo cobrado quando o cliente escolhe entrega.</p>
       </div>
 
       <button

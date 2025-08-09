@@ -10,9 +10,10 @@ export default function SimuladorWhatsApp() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const scrollRef = useRef(null);
 
-  async function enviar() {
-    if (!body.trim()) return;
-    await axios.post(`${API}/api/simular`, { from, body });
+  async function enviar(msg = null) {
+    const text = (msg ?? body).trim();
+    if (!text) return;
+    await axios.post(`${API}/api/simular`, { from, body: text });
     setBody('');
     await carregar();
   }
@@ -39,6 +40,16 @@ export default function SimuladorWhatsApp() {
     const id = setInterval(() => carregar(), 1000);
     return () => clearInterval(id);
   }, [autoRefresh, from]);
+
+  const Atalho = ({ label, send }) => (
+    <button
+      onClick={() => enviar(send)}
+      className="border rounded px-3 py-2 text-sm hover:bg-gray-100"
+      title={`Enviar: ${send}`}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
@@ -101,24 +112,60 @@ export default function SimuladorWhatsApp() {
           onKeyDown={e => e.key === 'Enter' && enviar()}
         />
         <button
-          onClick={enviar}
+          onClick={() => enviar()}
           className="px-4 bg-green-600 text-white rounded hover:bg-green-700"
         >
           Enviar
         </button>
       </div>
 
-      {/* Atalhos úteis */}
-      <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {['oi', '1', '2', 'P', 'M', 'G', 'sim', 'não', '1', '2', '3', '1', '2', '3'].map((t, i) => (
-          <button
-            key={i}
-            onClick={() => setBody(t)}
-            className="border rounded px-3 py-2 text-sm hover:bg-gray-100"
-          >
-            {t}
-          </button>
-        ))}
+      {/* Atalhos por etapa */}
+      <div className="mt-5 grid gap-3">
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Início / Cardápio</h3>
+          <div className="flex flex-wrap gap-2">
+            <Atalho label="oi" send="oi" />
+            <Atalho label="Cardápio 1" send="1" />
+            <Atalho label="Cardápio 2" send="2" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Tamanho</h3>
+          <div className="flex flex-wrap gap-2">
+            <Atalho label="P" send="P" />
+            <Atalho label="M" send="M" />
+            <Atalho label="G" send="G" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Bebida</h3>
+          <div className="flex flex-wrap gap-2">
+            <Atalho label="Sim" send="sim" />
+            <Atalho label="Não" send="não" />
+            <Atalho label="Coca Lata (1)" send="1" />
+            <Atalho label="Coca 1L (2)" send="2" />
+            <Atalho label="Coca 2L (3)" send="3" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Entrega</h3>
+          <div className="flex flex-wrap gap-2">
+            <Atalho label="Entrega (+taxa) [1]" send="1" />
+            <Atalho label="Retirar no local [2]" send="2" />
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold mb-2">Pagamento</h3>
+          <div className="flex flex-wrap gap-2">
+            <Atalho label="Dinheiro (1)" send="1" />
+            <Atalho label="PIX (2)" send="2" />
+            <Atalho label="Cartão (3)" send="3" />
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -9,11 +9,10 @@ const pedidoSchema = new mongoose.Schema({
   tamanho: String,
   bebida: String,
   formaPagamento: String,
+  tipoEntrega: { type: String, enum: ['Entrega', 'Retirar'], default: 'Entrega' },
+  taxaEntrega: { type: Number, default: 0 },
   total: Number,
-  data: {
-    type: Date,
-    default: Date.now
-  }
+  data: { type: Date, default: Date.now }
 });
 
 export default mongoose.model('Pedido', pedidoSchema);
