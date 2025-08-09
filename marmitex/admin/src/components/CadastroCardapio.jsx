@@ -1,68 +1,106 @@
-// frontend/src/components/CadastroCardapio.jsx
 import { useState } from 'react';
 import axios from 'axios';
 
+const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export default function CadastroCardapio() {
-  const [formulario, setFormulario] = useState({
-    data: '',
-    cardapio1: '',
-    cardapio2: '',
-    precoP: '',
-    precoM: '',
-    precoG: '',
-    precoCocaLata: '',
-    precoCoca1L: '',
-    precoCoca2L: ''
-  });
+  const [data, setData] = useState(() => new Date().toISOString().substring(0, 10));
+  const [card1Prato, setCard1Prato] = useState('');
+  const [card1Acomp, setCard1Acomp] = useState('');
+  const [card2Prato, setCard2Prato] = useState('');
+  const [card2Acomp, setCard2Acomp] = useState('');
+  const [msg, setMsg] = useState('');
 
-  function atualizarCampo(e) {
-    const { name, value } = e.target;
-    setFormulario({ ...formulario, [name]: value });
+  async function salvar(e) {
+    e.preventDefault();
+    setMsg('');
+    try {
+      const payload = {
+        data, // yyyy-mm-dd
+        cardapio1: {
+          prato: card1Prato,
+          acompanhamentos: card1Acomp.split(',').map(s => s.trim()).filter(Boolean)
+        },
+        cardapio2: {
+          prato: card2Prato,
+          acompanhamentos: card2Acomp.split(',').map(s => s.trim()).filter(Boolean)
+        }
+      };
+      await axios.post(`${API}/api/cardapios`, payload);
+      setMsg('✅ Cardápio salvo com sucesso!');
+      setCard1Prato(''); setCard1Acomp(''); setCard2Prato(''); setCard2Acomp('');
+    } catch (err) {
+      setMsg('❌ Erro ao salvar cardápio.');
+      console.error(err);
+    }
   }
-
-  async function enviar(e) {
-  e.preventDefault();
-  try {
-    const cardapio = {
-      ...formulario,
-      precoP: parseFloat(formulario.precoP),
-      precoM: parseFloat(formulario.precoM),
-      precoG: parseFloat(formulario.precoG),
-      precoCocaLata: parseFloat(formulario.precoCocaLata),
-      precoCoca1L: parseFloat(formulario.precoCoca1L),
-      precoCoca2L: parseFloat(formulario.precoCoca2L),
-    };
-
-    await axios.post(`${import.meta.env.VITE_API_URL}/api/cardapios`, cardapio);
-    alert('Cardápio salvo com sucesso!');
-  } catch (error) {
-    alert('Erro ao salvar cardápio.');
-  }
-}
-
 
   return (
-    <form onSubmit={enviar} className="max-w-xl mx-auto p-4 bg-white shadow rounded space-y-4">
-      <h2 className="text-xl font-bold">Cadastro de Cardápio</h2>
-
-      <input type="date" name="data" value={formulario.data} onChange={atualizarCampo} required className="w-full border p-2 rounded" />
-
-      <textarea name="cardapio1" value={formulario.cardapio1} onChange={atualizarCampo} placeholder="Cardápio 1" className="w-full border p-2 rounded" required />
-      <textarea name="cardapio2" value={formulario.cardapio2} onChange={atualizarCampo} placeholder="Cardápio 2" className="w-full border p-2 rounded" required />
-
-      <div className="grid grid-cols-3 gap-2">
-        <input name="precoP" value={formulario.precoP} onChange={atualizarCampo} placeholder="Preço P" type="number" step="0.01" className="border p-2 rounded" required />
-        <input name="precoM" value={formulario.precoM} onChange={atualizarCampo} placeholder="Preço M" type="number" step="0.01" className="border p-2 rounded" required />
-        <input name="precoG" value={formulario.precoG} onChange={atualizarCampo} placeholder="Preço G" type="number" step="0.01" className="border p-2 rounded" required />
+    <form onSubmit={salvar} className="bg-white p-4 rounded shadow max-w-3xl mx-auto">
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Data</label>
+          <input
+            type="date"
+            className="w-full border rounded px-3 py-2"
+            value={data}
+            onChange={e => setData(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        <input name="precoCocaLata" value={formulario.precoCocaLata} onChange={atualizarCampo} placeholder="Coca Lata" type="number" step="0.01" className="border p-2 rounded" required />
-        <input name="precoCoca1L" value={formulario.precoCoca1L} onChange={atualizarCampo} placeholder="Coca 1L" type="number" step="0.01" className="border p-2 rounded" required />
-        <input name="precoCoca2L" value={formulario.precoCoca2L} onChange={atualizarCampo} placeholder="Coca 2L" type="number" step="0.01" className="border p-2 rounded" required />
+      <h2 className="mt-4 font-semibold">Cardápio 1</h2>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Prato</label>
+          <input
+            className="w-full border rounded px-3 py-2"
+            value={card1Prato}
+            onChange={e => setCard1Prato(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Acompanhamentos (separe por vírgula)</label>
+          <input
+            className="w-full border rounded px-3 py-2"
+            placeholder="Arroz, Feijão, Salada"
+            value={card1Acomp}
+            onChange={e => setCard1Acomp(e.target.value)}
+            required
+          />
+        </div>
       </div>
 
-      <button type="submit" className="bg-green-600 text-white px-4 py-2 rounded">Salvar Cardápio</button>
+      <h2 className="mt-4 font-semibold">Cardápio 2</h2>
+      <div className="grid md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Prato</label>
+          <input
+            className="w-full border rounded px-3 py-2"
+            value={card2Prato}
+            onChange={e => setCard2Prato(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Acompanhamentos (separe por vírgula)</label>
+          <input
+            className="w-full border rounded px-3 py-2"
+            placeholder="Arroz, Farofa, Batata"
+            value={card2Acomp}
+            onChange={e => setCard2Acomp(e.target.value)}
+            required
+          />
+        </div>
+      </div>
+
+      <button className="mt-4 bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">
+        Salvar Cardápio
+      </button>
+
+      {msg && <p className="mt-3">{msg}</p>}
     </form>
   );
 }
