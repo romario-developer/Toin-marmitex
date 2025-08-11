@@ -21,38 +21,44 @@ export default function SimuladorWhatsApp() {
   async function carregar() {
     const res = await axios.get(`${API}/api/simular/conversa/${from}`);
     setMensagens(res.data.mensagens || []);
-    setTimeout(() => {
-      scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' });
-    }, 50);
+    setTimeout(() => scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }), 50);
   }
 
   async function resetar() {
     await axios.post(`${API}/api/simular/reset`, { from });
     await carregar();
+    await mostrarCardapioHoje();
   }
 
-  // 🔹 NOVO: mostrar cardápio do dia como mensagem do "bot"
   async function mostrarCardapioHoje() {
-  try {
-    const { data } = await axios.get(`${API}/api/cardapios/hoje`);
-    const c1 = data.cardapio1?.descricao || '';
-    const c2 = data.cardapio2?.descricao || '';
-    const texto =
-      'Olá! Seja bem-vindo ao marmitex!\n\n' +
-      'Digite o numero da opção desejada:\n' +
-      `1. CARDÁPIO 1 : ${c1}\n` +
-      `2. CARDÁPIO 2. ${c2}`;
-    setMensagens(prev => [...prev, { who: 'bot', text: texto, at: Date.now() }]);
-    setTimeout(() => scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }), 50);
-  } catch {
-    setMensagens(prev => [...prev, { who: 'bot', text: 'Nenhum cardápio encontrado para hoje.', at: Date.now() }]);
+    try {
+      const { data } = await axios.get(`${API}/api/cardapios/hoje`);
+      const c1 = data.cardapio1?.descricao || '';
+      const c2 = data.cardapio2?.descricao || '';
+      const texto =
+        'Olá! Seja bem-vindo ao marmitex!\n\n' +
+        'Digite o numero da opção desejada:\n' +
+        `1. CARDÁPIO 1 : ${c1}\n` +
+        `2. CARDÁPIO 2. ${c2}`;
+      setMensagens(prev => [...prev, { who: 'bot', text: texto, at: Date.now() }]);
+      setTimeout(() => scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }), 50);
+    } catch {
+      setMensagens(prev => [...prev, { who: 'bot', text: 'Nenhum cardápio encontrado para hoje.', at: Date.now() }]);
+    }
   }
-}
-
 
   useEffect(() => {
-    carregar();
+    (async () => {
+      await carregar();
+      await mostrarCardapioHoje();
+    })();
   }, [from]);
+
+  useEffect(() => {
+    const handler = () => mostrarCardapioHoje();
+    window.addEventListener('cardapio-atualizado', handler);
+    return () => window.removeEventListener('cardapio-atualizado', handler);
+  }, []);
 
   useEffect(() => {
     if (!autoRefresh) return;
@@ -71,54 +77,39 @@ export default function SimuladorWhatsApp() {
   );
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">💬 Simulador de Conversa (WhatsApp - Teste)</h1>
+    <div className="p-3 sm:p-6 max-w-2xl mx-auto">
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">💬 Simulador de Conversa</h1>
 
       <div className="flex gap-2 mb-3 items-end flex-wrap">
-        <div className="flex-1 min-w-[220px]">
-          <label className="block text-sm font-medium mb-1">Número (from)</label>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs sm:text-sm font-medium mb-1">Número (from)</label>
           <input
             className="w-full border rounded px-3 py-2"
             value={from}
             onChange={e => setFrom(e.target.value)}
           />
         </div>
-        <button
-          onClick={resetar}
-          className="h-10 px-4 bg-red-600 text-white rounded hover:bg-red-700"
-        >
-          Limpar conversa
-        </button>
-        <button
-          onClick={mostrarCardapioHoje}
-          className="h-10 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        >
-          Cardápio de hoje
-        </button>
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={autoRefresh}
-            onChange={e => setAutoRefresh(e.target.checked)}
-          />
-          Auto atualizar
-        </label>
+        <div className="flex gap-2 w-full sm:w-auto">
+          <button onClick={resetar} className="flex-1 sm:flex-none h-10 px-4 bg-red-600 text-white rounded hover:bg-red-700">
+            Limpar conversa
+          </button>
+          <button onClick={mostrarCardapioHoje} className="flex-1 sm:flex-none h-10 px-4 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+            Cardápio de hoje
+          </button>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={autoRefresh} onChange={e => setAutoRefresh(e.target.checked)} />
+            Auto
+          </label>
+        </div>
       </div>
 
-      <div
-        ref={scrollRef}
-        className="bg-[#e5ddd5] rounded-lg p-3 h-[60vh] overflow-y-auto border"
-      >
+      <div ref={scrollRef} className="bg-[#e5ddd5] rounded-lg p-3 h-[55vh] sm:h-[60vh] md:h-[70vh] overflow-y-auto border">
         {mensagens.length === 0 && (
-          <div className="text-center text-sm text-gray-600">Sem mensagens. Envie "oi" ou clique em “Cardápio de hoje”.</div>
+          <div className="text-center text-sm text-gray-600">Sem mensagens.</div>
         )}
-
         {mensagens.map((m, i) => (
           <div key={i} className={`w-full my-2 flex ${m.who === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div
-              className={`max-w-[80%] rounded-lg px-3 py-2 text-sm shadow
-              ${m.who === 'user' ? 'bg-[#dcf8c6]' : 'bg-white'}`}
-            >
+            <div className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-2 text-sm shadow ${m.who === 'user' ? 'bg-[#dcf8c6]' : 'bg-white'}`}>
               <div className="whitespace-pre-wrap">{m.text}</div>
               <div className="text-[10px] text-gray-500 text-right mt-1">
                 {new Date(m.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
@@ -136,15 +127,12 @@ export default function SimuladorWhatsApp() {
           onChange={e => setBody(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && enviar()}
         />
-        <button
-          onClick={() => enviar()}
-          className="px-4 bg-green-600 text-white rounded hover:bg-green-700"
-        >
+        <button onClick={() => enviar()} className="px-4 bg-green-600 text-white rounded hover:bg-green-700">
           Enviar
         </button>
       </div>
 
-      {/* Atalhos por etapa */}
+      {/* Atalhos */}
       <div className="mt-5 grid gap-3">
         <div>
           <h3 className="text-sm font-semibold mb-2">Início / Cardápio</h3>
@@ -154,7 +142,6 @@ export default function SimuladorWhatsApp() {
             <Atalho label="Cardápio 2" send="2" />
           </div>
         </div>
-
         <div>
           <h3 className="text-sm font-semibold mb-2">Tamanho</h3>
           <div className="flex flex-wrap gap-2">
@@ -163,7 +150,6 @@ export default function SimuladorWhatsApp() {
             <Atalho label="G" send="G" />
           </div>
         </div>
-
         <div>
           <h3 className="text-sm font-semibold mb-2">Bebida</h3>
           <div className="flex flex-wrap gap-2">
@@ -174,7 +160,6 @@ export default function SimuladorWhatsApp() {
             <Atalho label="Coca 2L (3)" send="3" />
           </div>
         </div>
-
         <div>
           <h3 className="text-sm font-semibold mb-2">Entrega</h3>
           <div className="flex flex-wrap gap-2">
@@ -182,7 +167,6 @@ export default function SimuladorWhatsApp() {
             <Atalho label="Retirar no local [2]" send="2" />
           </div>
         </div>
-
         <div>
           <h3 className="text-sm font-semibold mb-2">Pagamento</h3>
           <div className="flex flex-wrap gap-2">

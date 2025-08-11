@@ -1,17 +1,15 @@
 import mongoose from 'mongoose';
 
 const pedidoSchema = new mongoose.Schema({
-  cliente: {
-    numero: String,
-    nome: String
-  },
+  cliente: { nome: String, numero: String },
   cardapioEscolhido: String,
   tamanho: String,
   bebida: String,
   formaPagamento: String,
-  tipoEntrega: { type: String, enum: ['Entrega', 'Retirar'], default: 'Entrega' },
-  taxaEntrega: { type: Number, default: 0 },
+  tipoEntrega: String,
+  taxaEntrega: Number,
   total: Number,
+  status: { type: String, enum: ['Em preparo', 'Pronto', 'Entregue'], default: 'Em preparo' },
   data: { type: Date, default: Date.now }
 });
 
