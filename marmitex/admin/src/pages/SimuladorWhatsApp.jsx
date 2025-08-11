@@ -1,3 +1,4 @@
+// admin/src/pages/SimuladorWhatsApp.jsx
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 
@@ -9,6 +10,8 @@ export default function SimuladorWhatsApp() {
   const [mensagens, setMensagens] = useState([]);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const scrollRef = useRef(null);
+
+  const fullUrl = (rel) => (rel?.startsWith('/uploads') ? `${API}${rel}` : rel);
 
   async function enviar(msg = null) {
     const text = (msg ?? body).trim();
@@ -35,18 +38,30 @@ export default function SimuladorWhatsApp() {
       const { data } = await axios.get(`${API}/api/cardapios/hoje`);
       const c1 = data.cardapio1?.descricao || '';
       const c2 = data.cardapio2?.descricao || '';
+      const i1 = data.cardapio1?.imagem || '';
+      const i2 = data.cardapio2?.imagem || '';
+
       const texto =
         'Olá! Seja bem-vindo ao marmitex!\n\n' +
         'Digite o numero da opção desejada:\n' +
         `1. CARDÁPIO 1 : ${c1}\n` +
         `2. CARDÁPIO 2. ${c2}`;
-      setMensagens(prev => [...prev, { who: 'bot', text: texto, at: Date.now() }]);
+
+      // adiciona TEXTO primeiro e depois as IMAGENS (se houver)
+      setMensagens(prev => [
+        ...prev,
+        { who: 'bot', text: texto, at: Date.now() },
+        ...(i1 ? [{ who: 'bot', text: `1. CARDÁPIO 1 : ${c1}`, image: i1, at: Date.now() }] : []),
+        ...(i2 ? [{ who: 'bot', text: `2. CARDÁPIO 2. ${c2}`, image: i2, at: Date.now() }] : []),
+      ]);
+
       setTimeout(() => scrollRef.current?.scrollTo({ top: 999999, behavior: 'smooth' }), 50);
     } catch {
       setMensagens(prev => [...prev, { who: 'bot', text: 'Nenhum cardápio encontrado para hoje.', at: Date.now() }]);
     }
   }
 
+  // ao trocar número, carrega + mostra cardápio
   useEffect(() => {
     (async () => {
       await carregar();
@@ -54,6 +69,7 @@ export default function SimuladorWhatsApp() {
     })();
   }, [from]);
 
+  // quando o cadastro salva/atualiza, mostramos cardápio de novo
   useEffect(() => {
     const handler = () => mostrarCardapioHoje();
     window.addEventListener('cardapio-atualizado', handler);
@@ -109,7 +125,17 @@ export default function SimuladorWhatsApp() {
         )}
         {mensagens.map((m, i) => (
           <div key={i} className={`w-full my-2 flex ${m.who === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-2 text-sm shadow ${m.who === 'user' ? 'bg-[#dcf8c6]' : 'bg-white'}`}>
+            <div
+              className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 py-2 text-sm shadow
+              ${m.who === 'user' ? 'bg-[#dcf8c6]' : 'bg-white'}`}
+            >
+              {m.image && (
+                <img
+                  src={fullUrl(m.image)}
+                  alt="Imagem do cardápio"
+                  className="w-full max-h-64 object-cover rounded mb-1"
+                />
+              )}
               <div className="whitespace-pre-wrap">{m.text}</div>
               <div className="text-[10px] text-gray-500 text-right mt-1">
                 {new Date(m.at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}

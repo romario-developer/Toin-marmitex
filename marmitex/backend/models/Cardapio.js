@@ -1,9 +1,12 @@
 // backend/models/Cardapio.js
 import mongoose from 'mongoose';
 
-// Apenas descrição para cada cardápio
+// descrição + imagem por cardápio
 const itemSchema = new mongoose.Schema(
-  { descricao: { type: String, default: '' } },
+  {
+    descricao: { type: String, default: '' },
+    imagem: { type: String, default: '' } // ex.: /uploads/cardapio1-xxx.jpg
+  },
   { _id: false }
 );
 

@@ -7,6 +7,8 @@ export default function CadastroCardapio() {
   const [data, setData] = useState(() => new Date().toISOString().substring(0, 10));
   const [c1Desc, setC1Desc] = useState('');
   const [c2Desc, setC2Desc] = useState('');
+  const [img1, setImg1] = useState('');
+  const [img2, setImg2] = useState('');
   const [msg, setMsg] = useState('');
   const [isHoje, setIsHoje] = useState(true);
   const [editingHoje, setEditingHoje] = useState(false);
@@ -23,6 +25,8 @@ export default function CadastroCardapio() {
       setData(new Date(d.data).toISOString().substring(0, 10));
       setC1Desc(d.cardapio1?.descricao || '');
       setC2Desc(d.cardapio2?.descricao || '');
+      setImg1(d.cardapio1?.imagem || '');
+      setImg2(d.cardapio2?.imagem || '');
       setEditingHoje(true);
       setMsg('ℹ️ Carregado cardápio de hoje.');
     } catch {
@@ -31,13 +35,37 @@ export default function CadastroCardapio() {
     }
   }
 
+  // upload para /api/upload -> retorna { url: '/uploads/xxx.jpg' }
+  async function uploadImagem(file) {
+    const form = new FormData();
+    form.append('file', file);
+    const { data } = await axios.post(`${API}/api/upload`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data.url;
+  }
+
+  async function onPick1(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const url = await uploadImagem(f);
+    setImg1(url);
+  }
+  async function onPick2(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const url = await uploadImagem(f);
+    setImg2(url);
+  }
+
   async function salvar(e) {
     e.preventDefault();
     setMsg('');
+
     const payload = {
       data,
-      cardapio1: { descricao: c1Desc },
-      cardapio2: { descricao: c2Desc }
+      cardapio1: { descricao: c1Desc, imagem: img1 },
+      cardapio2: { descricao: c2Desc, imagem: img2 }
     };
 
     try {
@@ -57,6 +85,8 @@ export default function CadastroCardapio() {
       setMsg('❌ Erro ao salvar/atualizar cardápio.');
     }
   }
+
+  const fullUrl = (rel) => rel?.startsWith('/uploads') ? `${API}${rel}` : rel;
 
   return (
     <form onSubmit={salvar} className="bg-white p-3 sm:p-4 rounded shadow max-w-3xl mx-auto">
@@ -86,6 +116,11 @@ export default function CadastroCardapio() {
         onChange={e => setC1Desc(e.target.value)}
         required
       />
+      <div className="mt-2 flex items-center gap-3">
+        <label className="text-sm">Imagem</label>
+        <input type="file" accept="image/*" capture="environment" onChange={onPick1} />
+        {img1 && <img src={fullUrl(img1)} alt="Cardápio 1" className="h-16 rounded border" />}
+      </div>
 
       <h2 className="mt-4 font-semibold">Cardápio 2</h2>
       <textarea
@@ -96,6 +131,11 @@ export default function CadastroCardapio() {
         onChange={e => setC2Desc(e.target.value)}
         required
       />
+      <div className="mt-2 flex items-center gap-3">
+        <label className="text-sm">Imagem</label>
+        <input type="file" accept="image/*" capture="environment" onChange={onPick2} />
+        {img2 && <img src={fullUrl(img2)} alt="Cardápio 2" className="h-16 rounded border" />}
+      </div>
 
       <button className="mt-4 bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 w-full sm:w-auto">
         {isHoje ? (editingHoje ? 'Atualizar Cardápio de Hoje' : 'Salvar Cardápio de Hoje') : 'Salvar Cardápio'}

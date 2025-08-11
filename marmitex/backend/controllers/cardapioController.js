@@ -1,7 +1,7 @@
 // backend/controllers/cardapioController.js
 import Cardapio from '../models/Cardapio.js';
 
-// POST /api/cardapios  -> cria para a data selecionada (bloqueia duplicado no mesmo dia)
+// POST /api/cardapios  -> cria para a data (bloqueia duplicado no mesmo dia)
 export const salvarCardapio = async (req, res) => {
   try {
     const dataReq = req.body.data ? new Date(req.body.data) : new Date();
@@ -17,8 +17,14 @@ export const salvarCardapio = async (req, res) => {
 
     const novo = new Cardapio({
       data: inicio,
-      cardapio1: { descricao: req.body.cardapio1?.descricao || '' },
-      cardapio2: { descricao: req.body.cardapio2?.descricao || '' }
+      cardapio1: {
+        descricao: req.body.cardapio1?.descricao || '',
+        imagem: req.body.cardapio1?.imagem || ''
+      },
+      cardapio2: {
+        descricao: req.body.cardapio2?.descricao || '',
+        imagem: req.body.cardapio2?.imagem || ''
+      }
     });
 
     await novo.save();
@@ -29,19 +35,19 @@ export const salvarCardapio = async (req, res) => {
   }
 };
 
-// GET /api/cardapios/hoje  -> retorna o cardápio do dia
-export const obterCardapioAtual = async (req, res) => {
+// GET /api/cardapios/hoje  -> cardápio do dia
+export const obterCardapioAtual = async (_req, res) => {
   try {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const amanha = new Date(hoje);
-    amanha.setDate(amanha.getDate() + 1);
+    const cardapio = await Cardapio.findOne({
+      $expr: {
+        $eq: [
+          { $dateTrunc: { date: "$data", unit: "day", timezone: "America/Bahia" } },
+          { $dateTrunc: { date: "$$NOW", unit: "day", timezone: "America/Bahia" } }
+        ]
+      }
+    });
 
-    const cardapio = await Cardapio.findOne({ data: { $gte: hoje, $lt: amanha } });
-    if (!cardapio) {
-      return res.status(404).json({ mensagem: 'Nenhum cardápio encontrado para hoje.' });
-    }
-
+    if (!cardapio) return res.status(404).json({ mensagem: 'Nenhum cardápio encontrado para hoje.' });
     res.json(cardapio);
   } catch (e) {
     console.error('Erro ao buscar cardápio do dia:', e);
@@ -52,15 +58,28 @@ export const obterCardapioAtual = async (req, res) => {
 // PUT /api/cardapios/hoje  -> atualiza (ou cria) o cardápio de hoje
 export const atualizarCardapioDeHoje = async (req, res) => {
   try {
-    const hoje = new Date(); hoje.setHours(0,0,0,0);
     const payload = {
-      data: hoje,
-      cardapio1: { descricao: req.body.cardapio1?.descricao || '' },
-      cardapio2: { descricao: req.body.cardapio2?.descricao || '' }
+      // data pode continuar sendo setada; manteremos coerência
+      data: new Date(),
+      cardapio1: {
+        descricao: req.body.cardapio1?.descricao || '',
+        imagem: req.body.cardapio1?.imagem || ''
+      },
+      cardapio2: {
+        descricao: req.body.cardapio2?.descricao || '',
+        imagem: req.body.cardapio2?.imagem || ''
+      }
     };
 
     const doc = await Cardapio.findOneAndUpdate(
-      { data: { $gte: hoje, $lt: new Date(hoje.getTime() + 24*60*60*1000) } },
+      {
+        $expr: {
+          $eq: [
+            { $dateTrunc: { date: "$data", unit: "day", timezone: "America/Bahia" } },
+            { $dateTrunc: { date: "$$NOW", unit: "day", timezone: "America/Bahia" } }
+          ]
+        }
+      },
       payload,
       { new: true, upsert: true }
     );
@@ -71,3 +90,4 @@ export const atualizarCardapioDeHoje = async (req, res) => {
     res.status(500).json({ erro: 'Erro ao atualizar cardápio de hoje.' });
   }
 };
+

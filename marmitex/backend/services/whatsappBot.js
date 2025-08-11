@@ -7,26 +7,22 @@ import Cardapio from '../models/Cardapio.js';
 
 dotenv.config();
 
-// ===== Memória p/ simulador =====
+// ===== Memória p/ simulador (suporte a image) =====
 const conversas = {};
-function pushMsg(from, who, text) {
+function pushMsg(from, who, text, extra = {}) {
   if (!conversas[from]) conversas[from] = [];
-  conversas[from].push({ who, text, at: Date.now() });
+  conversas[from].push({ who, text, at: Date.now(), ...extra });
 }
-export function getConversa(from) {
-  return conversas[from] ?? [];
-}
-export function resetConversa(from) {
-  conversas[from] = [];
-}
+export function getConversa(from) { return conversas[from] ?? []; }
+export function resetConversa(from) { conversas[from] = []; }
 
-// ===== Estado do bot =====
+// ===== Estado =====
 const sessoes = {};
 let cacheConfig = null;
 let cacheAt = 0;
 const CACHE_MS = 60_000;
 
-// ===== Config / helpers =====
+// ===== Helpers =====
 async function getConfig() {
   const now = Date.now();
   if (cacheConfig && (now - cacheAt) < CACHE_MS) return cacheConfig;
@@ -52,10 +48,7 @@ async function getCardapioHoje() {
   return Cardapio.findOne({ data: { $gte: hoje, $lt: amanha } });
 }
 
-function moeda(v) {
-  const n = Number(v ?? 0);
-  return `R$ ${n},00`;
-}
+function moeda(v) { return `R$ ${Number(v ?? 0)},00`; }
 function mensagemTamanhos(cfg) {
   const p = cfg.precosMarmita?.P ?? 0;
   const m = cfg.precosMarmita?.M ?? 0;
@@ -81,11 +74,7 @@ function mensagemBebidas(cfg) {
 }
 function mensagemEntrega(cfg) {
   const taxa = cfg.taxaEntrega ?? 0;
-  return (
-    'Entrega ou retirar no local?\n' +
-    `1. Entrega (+${moeda(taxa)})\n` +
-    '2. Retirar no local'
-  );
+  return 'Entrega ou retirar no local?\n' + `1. Entrega (+${moeda(taxa)})\n2. Retirar no local`;
 }
 
 // ===== Core =====
@@ -108,23 +97,49 @@ async function processarMensagem(client, msg, simulado = false) {
   switch (sessao.etapa) {
     case 'inicio': {
       const c = await getCardapioHoje();
+
+      // 1) TEXTO com descrições (sempre)
+      let textoBase = 'Olá! Seja bem-vindo ao marmitex!\n\nDigite o numero da opção desejada:\n';
       if (c) {
-        const c1 = c.cardapio1?.descricao || '';
-        const c2 = c.cardapio2?.descricao || '';
-        await enviar(
-          'Olá! Seja bem-vindo ao marmitex!\n\n' +
-          'Digite o numero da opção desejada:\n' +
-          `1. CARDÁPIO 1 : ${c1}\n` +
-          `2. CARDÁPIO 2. ${c2}`
-        );
+        const d1 = c.cardapio1?.descricao || '';
+        const d2 = c.cardapio2?.descricao || '';
+        textoBase += `1. CARDÁPIO 1 : ${d1}\n2. CARDÁPIO 2. ${d2}`;
       } else {
-        await enviar(
-          'Olá! Seja bem-vindo ao marmitex!\n\n' +
-          'Digite o numero da opção desejada:\n' +
-          '1. CARDÁPIO 1\n' +
-          '2. CARDÁPIO 2'
-        );
+        textoBase += '1. CARDÁPIO 1\n2. CARDÁPIO 2';
       }
+      await enviar(textoBase);
+
+      // 2) IMAGENS (se houver), sem substituir o texto
+      if (c) {
+        const i1 = c.cardapio1?.imagem || '';
+        const i2 = c.cardapio2?.imagem || '';
+        const d1 = c.cardapio1?.descricao || '';
+        const d2 = c.cardapio2?.descricao || '';
+
+        if (simulado) {
+          if (i1) pushMsg(remetente, 'bot', `1. CARDÁPIO 1 : ${d1}`, { image: i1 });
+          if (i2) pushMsg(remetente, 'bot', `2. CARDÁPIO 2. ${d2}`, { image: i2 });
+        } else {
+          const base = process.env.PUBLIC_BASE_URL || '';
+          try {
+            if (i1) await client.sendImage(
+              remetente,
+              i1.startsWith('http') ? i1 : base + i1,
+              'cardapio1.jpg',
+              `1. CARDÁPIO 1 : ${d1}`
+            );
+            if (i2) await client.sendImage(
+              remetente,
+              i2.startsWith('http') ? i2 : base + i2,
+              'cardapio2.jpg',
+              `2. CARDÁPIO 2. ${d2}`
+            );
+          } catch (e) {
+            console.warn('Falha ao enviar imagens do cardápio:', e?.message);
+          }
+        }
+      }
+
       sessao.etapa = 'cardapio';
       break;
     }
