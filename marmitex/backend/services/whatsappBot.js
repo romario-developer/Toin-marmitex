@@ -7,22 +7,46 @@ import Cardapio from '../models/Cardapio.js';
 
 dotenv.config();
 
-// ==== simulador (image suportada) ====
+// ===================== Memória do simulador =====================
 const conversas = {};
 function pushMsg(from, who, text, extra = {}) {
   if (!conversas[from]) conversas[from] = [];
   conversas[from].push({ who, text, at: Date.now(), ...extra });
 }
-export function getConversa(from) { return conversas[from] ?? []; }
-export function resetConversa(from) { conversas[from] = []; }
+export function getConversa(from) {
+  return conversas[from] ?? [];
+}
+export function resetConversa(from) {
+  conversas[from] = [];
+}
 
-// ==== estado ====
+// ===================== Controles de Privacidade =====================
+// .env:
+// MODO_PRIVADO=true
+// WHATSAPP_ALLOWED=5599999999999,5531999999999
+// START_KEY=toin
+const MODO_PRIVADO = String(process.env.MODO_PRIVADO || 'false') === 'true';
+const START_KEY = (process.env.START_KEY || 'toin').toLowerCase().trim();
+
+const ALLOWED = String(process.env.WHATSAPP_ALLOWED || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
+function isAllowedNumber(jid) {
+  // exemplos de jid: "5561999999999@c.us", "status@broadcast", "xxxx@g.us"
+  const num = (jid || '').split('@')[0];
+  if (!MODO_PRIVADO) return true;
+  return ALLOWED.includes(num);
+}
+
+// ===================== Estado / Cache =====================
 const sessoes = {};
 let cacheConfig = null;
 let cacheAt = 0;
 const CACHE_MS = 60_000;
 
-// ==== helpers ====
+// ===================== Helpers =====================
 async function getConfig() {
   const now = Date.now();
   if (cacheConfig && (now - cacheAt) < CACHE_MS) return cacheConfig;
@@ -48,7 +72,11 @@ async function getCardapioHoje() {
   return Cardapio.findOne({ data: { $gte: hoje, $lt: amanha } });
 }
 
-function moeda(v) { return `R$ ${Number(v ?? 0)},00`; }
+function moeda(v) {
+  const n = Number(v ?? 0);
+  return `R$ ${n},00`;
+}
+
 function mensagemTamanhos(cfg) {
   const p = cfg.precosMarmita?.P ?? 0;
   const m = cfg.precosMarmita?.M ?? 0;
@@ -61,6 +89,7 @@ function mensagemTamanhos(cfg) {
     'Responda com: P, M ou G.'
   );
 }
+
 function mensagemBebidas(cfg) {
   const lata = cfg.precosBebida?.lata ?? 0;
   const um = cfg.precosBebida?.umLitro ?? 0;
@@ -72,17 +101,34 @@ function mensagemBebidas(cfg) {
     `3. Coca 2L (${moeda(dois)})`
   );
 }
+
 function mensagemEntrega(cfg) {
   const taxa = cfg.taxaEntrega ?? 0;
-  return 'Entrega ou retirar no local?\n' + `1. Entrega (+${moeda(taxa)})\n2. Retirar no local`;
+  return (
+    'Entrega ou retirar no local?\n' +
+    `1. Entrega (+${moeda(taxa)})\n` +
+    '2. Retirar no local'
+  );
 }
 
-// ==== core ====
+// ===================== Núcleo do fluxo =====================
 async function processarMensagem(client, msg, simulado = false) {
-  const texto = msg.body?.toLowerCase()?.trim();
-  const remetente = msg.from;
+  const remetente = msg.from || '';
+  const texto = (msg.body || '').toLowerCase().trim();
 
-  if (!sessoes[remetente]) sessoes[remetente] = { etapa: 'inicio' };
+  // 1) bloquear status/grupos SEMPRE
+  if (remetente === 'status@broadcast') return;   // nunca postar em Status
+  if (msg.isStatus) return;                        // mensagens de status
+  if (msg.isGroupMsg || remetente.endsWith('@g.us')) return; // grupos
+
+  // 2) modo privado: responder somente para whitelisted
+  if (!isAllowedNumber(remetente)) {
+    console.log(`🔒 [Privado] Ignorado: ${remetente}`);
+    return;
+  }
+
+  // 3) sessão
+  if (!sessoes[remetente]) sessoes[remetente] = { etapa: 'inicio', autorizado: false };
   const sessao = sessoes[remetente];
 
   const enviar = async (mensagem) => {
@@ -96,61 +142,64 @@ async function processarMensagem(client, msg, simulado = false) {
 
   switch (sessao.etapa) {
     case 'inicio': {
+      // 🔑 Palavra‑chave para iniciar (ex.: "toin")
+      if (!sessao.autorizado) {
+        if (texto !== START_KEY) {
+          await enviar(`👋 Envie *${START_KEY}* para iniciar seu pedido.`);
+          return;
+        }
+        sessao.autorizado = true;
+      }
+
+      // Mensagem de boas‑vindas + descrições do cardápio
       const c = await getCardapioHoje();
-
-      // 1) Apenas o título
-      await enviar('Olá! Seja bem-vindo ao marmitex!');
-
+      let textoBase = 'Olá! Seja bem-vindo ao marmitex!\n\nDigite o numero da opção desejada:\n';
       if (c) {
-        const base = process.env.PUBLIC_BASE_URL || '';
-        const d1 = c.cardapio1?.descricao || '';
-        const d2 = c.cardapio2?.descricao || '';
+        const c1 = c.cardapio1?.descricao || '';
+        const c2 = c.cardapio2?.descricao || '';
+        textoBase += `1. CARDÁPIO 1 : ${c1}\n2. CARDÁPIO 2. ${c2}`;
+      } else {
+        textoBase += '1. CARDÁPIO 1\n2. CARDÁPIO 2';
+      }
+
+      // 1) Envia TEXTO primeiro
+      await enviar(textoBase);
+
+      // 2) Depois, tenta enviar IMAGENS (se houver)
+      if (c) {
         const i1 = c.cardapio1?.imagem || '';
         const i2 = c.cardapio2?.imagem || '';
+        const c1 = c.cardapio1?.descricao || '';
+        const c2 = c.cardapio2?.descricao || '';
 
-        // 2) Envia imagens (mesmo tamanho no simulador) com descrição na legenda
         if (simulado) {
-          if (i1) pushMsg(remetente, 'bot', `CARDÁPIO 1\n${d1}`, { image: i1 });
-          else pushMsg(remetente, 'bot', `CARDÁPIO 1\n${d1}`);
-
-          if (i2) pushMsg(remetente, 'bot', `CARDÁPIO 2\n${d2}`, { image: i2 });
-          else pushMsg(remetente, 'bot', `CARDÁPIO 2\n${d2}`);
+          if (i1) pushMsg(remetente, 'bot', `1. CARDÁPIO 1 : ${c1}`, { image: i1 });
+          if (i2) pushMsg(remetente, 'bot', `2. CARDÁPIO 2. ${c2}`, { image: i2 });
         } else {
+          const base = process.env.PUBLIC_BASE_URL || '';
           try {
             if (i1) {
               await client.sendImage(
                 remetente,
                 i1.startsWith('http') ? i1 : base + i1,
                 'cardapio1.jpg',
-                `CARDÁPIO 1\n${d1}`
+                `1. CARDÁPIO 1 : ${c1}`
               );
-            } else {
-              await enviar(`CARDÁPIO 1\n${d1}`);
             }
-
             if (i2) {
               await client.sendImage(
                 remetente,
                 i2.startsWith('http') ? i2 : base + i2,
                 'cardapio2.jpg',
-                `CARDÁPIO 2\n${d2}`
+                `2. CARDÁPIO 2. ${c2}`
               );
-            } else {
-              await enviar(`CARDÁPIO 2\n${d2}`);
             }
           } catch (e) {
             console.warn('Falha ao enviar imagens do cardápio:', e?.message);
-            // fallback apenas texto
-            await enviar(`CARDÁPIO 1\n${d1}`);
-            await enviar(`CARDÁPIO 2\n${d2}`);
           }
         }
-      } else {
-        // Fallback sem cardápio cadastrado
-        await enviar('Sem cardápio cadastrado para hoje.');
       }
 
-      // segue para escolha (o usuário já consegue responder 1 ou 2 vendo as legendas)
       sessao.etapa = 'cardapio';
       break;
     }
@@ -162,7 +211,7 @@ async function processarMensagem(client, msg, simulado = false) {
         await enviar(mensagemTamanhos(cfg1));
         sessao.etapa = 'tamanho';
       } else {
-        await enviar('Por favor, responda com 1 ou 2.');
+        await enviar('Por favor, digite 1 ou 2 para escolher o cardápio.');
       }
       break;
 
@@ -268,7 +317,7 @@ async function processarMensagem(client, msg, simulado = false) {
   }
 }
 
-// ==== APIs expostas ====
+// ===================== APIs expostas =====================
 export async function handleMensagemSimulada({ from, body }) {
   pushMsg(from, 'user', body);
   await processarMensagem(null, { from, body, sender: { pushname: 'Teste Simulado' } }, true);
@@ -280,7 +329,7 @@ export async function iniciarBot() {
     headless: false,
     autoClose: 180,
     browserArgs: ['--no-sandbox'],
-    catchQR: (base64Qrimg, asciiQR) => {
+    catchQR: (_img, asciiQR) => {
       console.log('⚠️ Escaneie o QR Code:', asciiQR);
     },
     statusFind: (statusSession) => {
@@ -294,7 +343,7 @@ export async function iniciarBot() {
   });
 }
 
-// ==== persistência ====
+// ===================== Persistência =====================
 async function salvarPedido(finalizacao, remetente, nome = '') {
   try {
     const novo = new Pedido({

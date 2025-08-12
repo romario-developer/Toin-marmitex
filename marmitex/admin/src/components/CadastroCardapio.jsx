@@ -25,12 +25,11 @@ export default function CadastroCardapio() {
   const formRef = useRef(null);
 
   useEffect(() => { carregarLista(); }, []);
-
   async function carregarLista() {
     try {
       const { data } = await axios.get(`${API}/api/cardapios?limit=50`);
       setLista(data);
-    } catch {/* ignore */}
+    } catch {}
   }
 
   function resetForm() {
@@ -46,16 +45,15 @@ export default function CadastroCardapio() {
     return rel?.startsWith('/uploads') ? `${API}${rel}` : rel;
   }
 
-  // ---- upload ----
+  // upload
   async function uploadImagem(file) {
     const form = new FormData();
     form.append('file', file);
     const { data } = await axios.post(`${API}/api/upload`, form, {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
-    return data.url; // ex: /uploads/123.jpg
+    return data.url;
   }
-
   async function onPick(file, setImg) {
     if (!file) return;
     try {
@@ -67,7 +65,7 @@ export default function CadastroCardapio() {
     }
   }
 
-  // ---- salvar/editar ----
+  // salvar / editar
   async function salvar(e) {
     e.preventDefault();
     setMsg('');
@@ -88,7 +86,6 @@ export default function CadastroCardapio() {
       }
       await carregarLista();
       resetForm();
-      // Atualiza simulador (se aberto)
       window.dispatchEvent(new CustomEvent('cardapio-atualizado'));
       formRef.current?.scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
@@ -122,9 +119,9 @@ export default function CadastroCardapio() {
 
   const ImgPreview = ({ src, alt }) => (
     src ? (
-      <img src={fullUrl(src)} alt={alt} className="h-32 w-32 object-cover rounded-lg border" />
+      <img src={fullUrl(src)} alt={alt} className="h-28 w-28 sm:h-32 sm:w-32 object-cover rounded-lg border" />
     ) : (
-      <div className="h-32 w-32 rounded-lg border flex items-center justify-center text-xs text-gray-500">
+      <div className="h-28 w-28 sm:h-32 sm:w-32 rounded-lg border flex items-center justify-center text-xs text-gray-500">
         Sem imagem
       </div>
     )
@@ -132,7 +129,6 @@ export default function CadastroCardapio() {
 
   const Picker = ({ camRef, galRef, onPickFile }) => (
     <div className="flex gap-2 flex-wrap">
-      {/* inputs ocultos */}
       <input
         ref={camRef}
         type="file"
@@ -148,18 +144,17 @@ export default function CadastroCardapio() {
         className="hidden"
         onChange={(e) => onPickFile(e.target.files?.[0])}
       />
-      {/* botões */}
       <button
         type="button"
         onClick={() => camRef.current?.click()}
-        className="px-3 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700"
+        className="px-3 py-2 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 w-full sm:w-auto"
       >
         Tirar foto
       </button>
       <button
         type="button"
         onClick={() => galRef.current?.click()}
-        className="px-3 py-2 text-sm bg-slate-600 text-white rounded hover:bg-slate-700"
+        className="px-3 py-2 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 w-full sm:w-auto"
       >
         Galeria
       </button>
@@ -169,8 +164,8 @@ export default function CadastroCardapio() {
   return (
     <div className="max-w-5xl mx-auto">
       {/* FORM */}
-      <form ref={formRef} onSubmit={salvar} className="bg-white p-4 rounded shadow">
-        <h1 className="text-xl sm:text-2xl font-bold mb-3">
+      <form ref={formRef} onSubmit={salvar} className="bg-white p-3 sm:p-4 rounded shadow">
+        <h1 className="text-lg sm:text-2xl font-bold mb-3">
           {editId ? 'Editar Cardápio' : 'Cadastro de Cardápio'}
         </h1>
         {msg && <p className="mb-3 text-sm">{msg}</p>}
@@ -196,7 +191,7 @@ export default function CadastroCardapio() {
           onChange={e => setC1Desc(e.target.value)}
           required
         />
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
           <ImgPreview src={img1} alt="Cardápio 1" />
           <Picker camRef={cam1Ref} galRef={gal1Ref} onPickFile={(file) => onPick(file, setImg1)} />
         </div>
@@ -211,20 +206,20 @@ export default function CadastroCardapio() {
           onChange={e => setC2Desc(e.target.value)}
           required
         />
-        <div className="mt-2 flex items-center gap-3">
+        <div className="mt-2 flex items-center gap-3 flex-wrap">
           <ImgPreview src={img2} alt="Cardápio 2" />
           <Picker camRef={cam2Ref} galRef={gal2Ref} onPickFile={(file) => onPick(file, setImg2)} />
         </div>
 
-        <div className="mt-4 flex gap-2">
-          <button className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700">
+        <div className="mt-4 grid grid-cols-1 sm:flex sm:gap-2">
+          <button className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 w-full sm:w-auto">
             {editId ? 'Salvar alterações' : 'Salvar cardápio'}
           </button>
           {editId && (
             <button
               type="button"
               onClick={resetForm}
-              className="px-4 py-2 rounded border bg-white hover:bg-gray-50"
+              className="px-5 py-2 rounded border bg-white hover:bg-gray-50 w-full sm:w-auto mt-2 sm:mt-0"
             >
               Cancelar edição
             </button>
@@ -233,12 +228,70 @@ export default function CadastroCardapio() {
       </form>
 
       {/* LISTA */}
-      <div className="mt-6 bg-white p-4 rounded shadow">
+      <div className="mt-6 bg-white p-3 sm:p-4 rounded shadow">
         <h2 className="text-lg font-semibold mb-3">Registros de Cardápio</h2>
-        {lista.length === 0 ? (
-          <p className="text-sm text-gray-500">Nenhum cardápio cadastrado.</p>
-        ) : (
-          <div className="overflow-x-auto">
+
+        {/* Mobile: cards */}
+        <div className="sm:hidden space-y-3">
+          {lista.length === 0 && <p className="text-sm text-gray-500">Nenhum cardápio cadastrado.</p>}
+          {lista.map(item => (
+            <div key={item._id} className="rounded border p-3">
+              <div className="text-sm font-medium">
+                {new Date(item.data).toLocaleDateString('pt-BR')}
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs font-semibold mb-1">Cardápio 1</div>
+                  <div className="flex items-center gap-2">
+                    {item.cardapio1?.imagem ? (
+                      <img
+                        src={fullUrl(item.cardapio1.imagem)}
+                        alt="c1"
+                        className="h-10 w-10 rounded object-cover border"
+                      />
+                    ) : <div className="h-10 w-10 rounded border text-[10px] text-gray-400 flex items-center justify-center">—</div>}
+                    <span className="text-sm">{item.cardapio1?.descricao}</span>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold mb-1">Cardápio 2</div>
+                  <div className="flex items-center gap-2">
+                    {item.cardapio2?.imagem ? (
+                      <img
+                        src={fullUrl(item.cardapio2.imagem)}
+                        alt="c2"
+                        className="h-10 w-10 rounded object-cover border"
+                      />
+                    ) : <div className="h-10 w-10 rounded border text-[10px] text-gray-400 flex items-center justify-center">—</div>}
+                    <span className="text-sm">{item.cardapio2?.descricao}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  className="px-3 py-2 rounded bg-amber-500 text-white hover:bg-amber-600"
+                  onClick={() => editar(item)}
+                >
+                  Editar
+                </button>
+                <button
+                  className="px-3 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+                  onClick={() => apagar(item._id)}
+                >
+                  Apagar
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: tabela */}
+        <div className="hidden sm:block overflow-x-auto">
+          {lista.length === 0 ? (
+            <p className="text-sm text-gray-500">Nenhum cardápio cadastrado.</p>
+          ) : (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-100">
                 <tr>
@@ -302,8 +355,8 @@ export default function CadastroCardapio() {
                 ))}
               </tbody>
             </table>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
