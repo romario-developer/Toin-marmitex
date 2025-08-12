@@ -133,7 +133,7 @@ export default function SimuladorWhatsApp() {
                 <img
                   src={fullUrl(m.image)}
                   alt="Imagem do cardápio"
-                  className="w-full max-h-64 object-cover rounded mb-1"
+                  className="w-full h-48 object-cover rounded-lg mb-1"  // altura fixa => mesmas dimensões
                 />
               )}
               <div className="whitespace-pre-wrap">{m.text}</div>

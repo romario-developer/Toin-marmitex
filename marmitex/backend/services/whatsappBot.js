@@ -7,7 +7,7 @@ import Cardapio from '../models/Cardapio.js';
 
 dotenv.config();
 
-// ===== Memória p/ simulador (suporte a image) =====
+// ==== simulador (image suportada) ====
 const conversas = {};
 function pushMsg(from, who, text, extra = {}) {
   if (!conversas[from]) conversas[from] = [];
@@ -16,13 +16,13 @@ function pushMsg(from, who, text, extra = {}) {
 export function getConversa(from) { return conversas[from] ?? []; }
 export function resetConversa(from) { conversas[from] = []; }
 
-// ===== Estado =====
+// ==== estado ====
 const sessoes = {};
 let cacheConfig = null;
 let cacheAt = 0;
 const CACHE_MS = 60_000;
 
-// ===== Helpers =====
+// ==== helpers ====
 async function getConfig() {
   const now = Date.now();
   if (cacheConfig && (now - cacheAt) < CACHE_MS) return cacheConfig;
@@ -77,7 +77,7 @@ function mensagemEntrega(cfg) {
   return 'Entrega ou retirar no local?\n' + `1. Entrega (+${moeda(taxa)})\n2. Retirar no local`;
 }
 
-// ===== Core =====
+// ==== core ====
 async function processarMensagem(client, msg, simulado = false) {
   const texto = msg.body?.toLowerCase()?.trim();
   const remetente = msg.from;
@@ -98,48 +98,59 @@ async function processarMensagem(client, msg, simulado = false) {
     case 'inicio': {
       const c = await getCardapioHoje();
 
-      // 1) TEXTO com descrições (sempre)
-      let textoBase = 'Olá! Seja bem-vindo ao marmitex!\n\nDigite o numero da opção desejada:\n';
+      // 1) Apenas o título
+      await enviar('Olá! Seja bem-vindo ao marmitex!');
+
       if (c) {
+        const base = process.env.PUBLIC_BASE_URL || '';
         const d1 = c.cardapio1?.descricao || '';
         const d2 = c.cardapio2?.descricao || '';
-        textoBase += `1. CARDÁPIO 1 : ${d1}\n2. CARDÁPIO 2. ${d2}`;
-      } else {
-        textoBase += '1. CARDÁPIO 1\n2. CARDÁPIO 2';
-      }
-      await enviar(textoBase);
-
-      // 2) IMAGENS (se houver), sem substituir o texto
-      if (c) {
         const i1 = c.cardapio1?.imagem || '';
         const i2 = c.cardapio2?.imagem || '';
-        const d1 = c.cardapio1?.descricao || '';
-        const d2 = c.cardapio2?.descricao || '';
 
+        // 2) Envia imagens (mesmo tamanho no simulador) com descrição na legenda
         if (simulado) {
-          if (i1) pushMsg(remetente, 'bot', `1. CARDÁPIO 1 : ${d1}`, { image: i1 });
-          if (i2) pushMsg(remetente, 'bot', `2. CARDÁPIO 2. ${d2}`, { image: i2 });
+          if (i1) pushMsg(remetente, 'bot', `CARDÁPIO 1\n${d1}`, { image: i1 });
+          else pushMsg(remetente, 'bot', `CARDÁPIO 1\n${d1}`);
+
+          if (i2) pushMsg(remetente, 'bot', `CARDÁPIO 2\n${d2}`, { image: i2 });
+          else pushMsg(remetente, 'bot', `CARDÁPIO 2\n${d2}`);
         } else {
-          const base = process.env.PUBLIC_BASE_URL || '';
           try {
-            if (i1) await client.sendImage(
-              remetente,
-              i1.startsWith('http') ? i1 : base + i1,
-              'cardapio1.jpg',
-              `1. CARDÁPIO 1 : ${d1}`
-            );
-            if (i2) await client.sendImage(
-              remetente,
-              i2.startsWith('http') ? i2 : base + i2,
-              'cardapio2.jpg',
-              `2. CARDÁPIO 2. ${d2}`
-            );
+            if (i1) {
+              await client.sendImage(
+                remetente,
+                i1.startsWith('http') ? i1 : base + i1,
+                'cardapio1.jpg',
+                `CARDÁPIO 1\n${d1}`
+              );
+            } else {
+              await enviar(`CARDÁPIO 1\n${d1}`);
+            }
+
+            if (i2) {
+              await client.sendImage(
+                remetente,
+                i2.startsWith('http') ? i2 : base + i2,
+                'cardapio2.jpg',
+                `CARDÁPIO 2\n${d2}`
+              );
+            } else {
+              await enviar(`CARDÁPIO 2\n${d2}`);
+            }
           } catch (e) {
             console.warn('Falha ao enviar imagens do cardápio:', e?.message);
+            // fallback apenas texto
+            await enviar(`CARDÁPIO 1\n${d1}`);
+            await enviar(`CARDÁPIO 2\n${d2}`);
           }
         }
+      } else {
+        // Fallback sem cardápio cadastrado
+        await enviar('Sem cardápio cadastrado para hoje.');
       }
 
+      // segue para escolha (o usuário já consegue responder 1 ou 2 vendo as legendas)
       sessao.etapa = 'cardapio';
       break;
     }
@@ -151,7 +162,7 @@ async function processarMensagem(client, msg, simulado = false) {
         await enviar(mensagemTamanhos(cfg1));
         sessao.etapa = 'tamanho';
       } else {
-        await enviar('Por favor, digite 1 ou 2 para escolher o cardápio.');
+        await enviar('Por favor, responda com 1 ou 2.');
       }
       break;
 
@@ -257,7 +268,7 @@ async function processarMensagem(client, msg, simulado = false) {
   }
 }
 
-// ===== APIs expostas =====
+// ==== APIs expostas ====
 export async function handleMensagemSimulada({ from, body }) {
   pushMsg(from, 'user', body);
   await processarMensagem(null, { from, body, sender: { pushname: 'Teste Simulado' } }, true);
@@ -283,7 +294,7 @@ export async function iniciarBot() {
   });
 }
 
-// ===== Persistência =====
+// ==== persistência ====
 async function salvarPedido(finalizacao, remetente, nome = '') {
   try {
     const novo = new Pedido({
