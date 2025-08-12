@@ -1,27 +1,82 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Header from './components/Header';
-
-// Páginas/Componentes existentes no seu projeto:
+import { Routes, Route, Navigate } from 'react-router-dom';
 import CadastroCardapio from './components/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
 import Configuracoes from './pages/Configuracoes';
 import SimuladorWhatsApp from './pages/SimuladorWhatsApp';
+import Login from './pages/Login';
+import ProtectedRoute from './components/ProtectedRoute';
+import NavBar from './components/NavBar';
 
 export default function App() {
   return (
-    <Router>
-      <div className="min-h-screen bg-gray-100">
-        <Header />
+    <div className="min-h-screen bg-gray-100">
+      <Routes>
+        {/* público */}
+        <Route path="/login" element={<Login onSuccess={() => window.location.replace('/cardapio')} />} />
 
-        <main className="mx-auto max-w-6xl p-3 sm:p-6">
-          <Routes>
-            <Route path="/" element={<CadastroCardapio />} />
-            <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/configuracoes" element={<Configuracoes />} />
-            <Route path="/simulador" element={<SimuladorWhatsApp />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+        {/* protegido */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Navigate to="/cardapio" replace />} />
+        </Route>
+
+        <Route
+          path="/cardapio"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <CadastroCardapio />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/pedidos"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <Pedidos />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/config"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <Configuracoes />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/simulador"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <SimuladorWhatsApp />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* fallback */}
+        <Route path="*" element={<Navigate to="/cardapio" replace />} />
+      </Routes>
+    </div>
   );
 }
