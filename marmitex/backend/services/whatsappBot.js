@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import Pedido from '../models/Pedido.js';
 import Configuracao from '../models/Configuracao.js';
 import Cardapio from '../models/Cardapio.js';
+import NumeroPermitido from '../models/NumeroPermitido.js';
+import { conectarWhatsapp } from '../config/wppconnect.js';
 
 dotenv.config();
 
@@ -21,10 +23,6 @@ export function resetConversa(from) {
 }
 
 // ===================== Controles de Privacidade =====================
-// .env:
-// MODO_PRIVADO=true
-// WHATSAPP_ALLOWED=5599999999999,5531999999999
-// START_KEY=toin
 const MODO_PRIVADO = String(process.env.MODO_PRIVADO || 'false') === 'true';
 const START_KEY = (process.env.START_KEY || 'toin').toLowerCase().trim();
 
@@ -33,12 +31,18 @@ const ALLOWED = String(process.env.WHATSAPP_ALLOWED || '')
   .map(s => s.trim())
   .filter(Boolean);
 
-function isAllowedNumber(jid) {
-  // exemplos de jid: "5561999999999@c.us", "status@broadcast", "xxxx@g.us"
+async function isAllowedNumber(jid) {
   const num = (jid || '').split('@')[0];
   if (!MODO_PRIVADO) return true;
-  return ALLOWED.includes(num);
+
+  // Checa se está no .env (opcional, se quiser manter ambos)
+  if (ALLOWED.includes(num)) return true;
+
+  // Checa no banco
+  const permitido = await NumeroPermitido.findOne({ numero: num });
+  return !!permitido;
 }
+
 
 // ===================== Estado / Cache =====================
 const sessoes = {};
@@ -78,35 +82,28 @@ function moeda(v) {
 }
 
 function mensagemTamanhos(cfg) {
-  const p = cfg.precosMarmita?.P ?? 0;
-  const m = cfg.precosMarmita?.M ?? 0;
-  const g = cfg.precosMarmita?.G ?? 0;
   return (
     'Qual o tamanho da marmita?\n' +
-    `P (${moeda(p)})\n` +
-    `M (${moeda(m)})\n` +
-    `G (${moeda(g)})\n\n` +
+    `P (${moeda(cfg.precosMarmita?.P ?? 0)})\n` +
+    `M (${moeda(cfg.precosMarmita?.M ?? 0)})\n` +
+    `G (${moeda(cfg.precosMarmita?.G ?? 0)})\n\n` +
     'Responda com: P, M ou G.'
   );
 }
 
 function mensagemBebidas(cfg) {
-  const lata = cfg.precosBebida?.lata ?? 0;
-  const um = cfg.precosBebida?.umLitro ?? 0;
-  const dois = cfg.precosBebida?.doisLitros ?? 0;
   return (
     'Escolha a bebida:\n' +
-    `1. Coca Lata (${moeda(lata)})\n` +
-    `2. Coca 1L (${moeda(um)})\n` +
-    `3. Coca 2L (${moeda(dois)})`
+    `1. Coca Lata (${moeda(cfg.precosBebida?.lata ?? 0)})\n` +
+    `2. Coca 1L (${moeda(cfg.precosBebida?.umLitro ?? 0)})\n` +
+    `3. Coca 2L (${moeda(cfg.precosBebida?.doisLitros ?? 0)})`
   );
 }
 
 function mensagemEntrega(cfg) {
-  const taxa = cfg.taxaEntrega ?? 0;
   return (
     'Entrega ou retirar no local?\n' +
-    `1. Entrega (+${moeda(taxa)})\n` +
+    `1. Entrega (+${moeda(cfg.taxaEntrega ?? 0)})\n` +
     '2. Retirar no local'
   );
 }
@@ -116,24 +113,18 @@ async function processarMensagem(client, msg, simulado = false) {
   const remetente = msg.from || '';
   const texto = (msg.body || '').toLowerCase().trim();
 
-  // 1) bloquear status/grupos SEMPRE
-  if (remetente === 'status@broadcast') return;   // nunca postar em Status
-  if (msg.isStatus) return;                        // mensagens de status
-  if (msg.isGroupMsg || remetente.endsWith('@g.us')) return; // grupos
-
-  // 2) modo privado: responder somente para whitelisted
+  if (remetente === 'status@broadcast' || msg.isStatus) return;
+  if (msg.isGroupMsg || remetente.endsWith('@g.us')) return;
   if (!isAllowedNumber(remetente)) {
     console.log(`🔒 [Privado] Ignorado: ${remetente}`);
     return;
   }
 
-  // 3) sessão
   if (!sessoes[remetente]) sessoes[remetente] = { etapa: 'inicio', autorizado: false };
   const sessao = sessoes[remetente];
 
   const enviar = async (mensagem) => {
     if (simulado) {
-      console.log(`💬 [Simulado] Para ${remetente}: ${mensagem}`);
       pushMsg(remetente, 'bot', mensagem);
     } else {
       await client.sendText(remetente, mensagem);
@@ -142,7 +133,6 @@ async function processarMensagem(client, msg, simulado = false) {
 
   switch (sessao.etapa) {
     case 'inicio': {
-      // 🔑 Palavra‑chave para iniciar (ex.: "toin")
       if (!sessao.autorizado) {
         if (texto !== START_KEY) {
           await enviar(`👋 Envie *${START_KEY}* para iniciar seu pedido.`);
@@ -151,53 +141,20 @@ async function processarMensagem(client, msg, simulado = false) {
         sessao.autorizado = true;
       }
 
-      // Mensagem de boas‑vindas + descrições do cardápio
       const c = await getCardapioHoje();
-      let textoBase = 'Olá! Seja bem-vindo ao marmitex!\n\nDigite o numero da opção desejada:\n';
-      if (c) {
-        const c1 = c.cardapio1?.descricao || '';
-        const c2 = c.cardapio2?.descricao || '';
-        textoBase += `1. CARDÁPIO 1 : ${c1}\n2. CARDÁPIO 2. ${c2}`;
-      } else {
-        textoBase += '1. CARDÁPIO 1\n2. CARDÁPIO 2';
+      let textoBase = 'Olá! Seja bem-vindo ao marmitex!\n\n';
+      if (!c) {
+        textoBase += 'Cardápio não disponível hoje.';
+        await enviar(textoBase);
+        return;
       }
 
-      // 1) Envia TEXTO primeiro
-      await enviar(textoBase);
-
-      // 2) Depois, tenta enviar IMAGENS (se houver)
-      if (c) {
-        const i1 = c.cardapio1?.imagem || '';
-        const i2 = c.cardapio2?.imagem || '';
-        const c1 = c.cardapio1?.descricao || '';
-        const c2 = c.cardapio2?.descricao || '';
-
-        if (simulado) {
-          if (i1) pushMsg(remetente, 'bot', `1. CARDÁPIO 1 : ${c1}`, { image: i1 });
-          if (i2) pushMsg(remetente, 'bot', `2. CARDÁPIO 2. ${c2}`, { image: i2 });
-        } else {
-          const base = process.env.PUBLIC_BASE_URL || '';
-          try {
-            if (i1) {
-              await client.sendImage(
-                remetente,
-                i1.startsWith('http') ? i1 : base + i1,
-                'cardapio1.jpg',
-                `1. CARDÁPIO 1 : ${c1}`
-              );
-            }
-            if (i2) {
-              await client.sendImage(
-                remetente,
-                i2.startsWith('http') ? i2 : base + i2,
-                'cardapio2.jpg',
-                `2. CARDÁPIO 2. ${c2}`
-              );
-            }
-          } catch (e) {
-            console.warn('Falha ao enviar imagens do cardápio:', e?.message);
-          }
-        }
+      const base = process.env.PUBLIC_BASE_URL || '';
+      if (c.cardapio1?.imagem) {
+        await client.sendImage(remetente, base + c.cardapio1.imagem, 'cardapio1.jpg', c.cardapio1.descricao);
+      }
+      if (c.cardapio2?.imagem) {
+        await client.sendImage(remetente, base + c.cardapio2.imagem, 'cardapio2.jpg', c.cardapio2.descricao);
       }
 
       sessao.etapa = 'cardapio';
@@ -205,13 +162,12 @@ async function processarMensagem(client, msg, simulado = false) {
     }
 
     case 'cardapio':
-      if (texto === '1' || texto === '2') {
+      if (['1', '2'].includes(texto)) {
         sessao.finalizacao = { cardapio: `CARDÁPIO ${texto}` };
-        const cfg1 = await getConfig();
-        await enviar(mensagemTamanhos(cfg1));
+        await enviar(mensagemTamanhos(await getConfig()));
         sessao.etapa = 'tamanho';
       } else {
-        await enviar('Por favor, digite 1 ou 2 para escolher o cardápio.');
+        await enviar('Digite 1 ou 2 para escolher o cardápio.');
       }
       break;
 
@@ -221,144 +177,100 @@ async function processarMensagem(client, msg, simulado = false) {
         await enviar('Deseja bebida? Digite "sim" ou "não".');
         sessao.etapa = 'bebida';
       } else {
-        const cfg2 = await getConfig();
-        await enviar('Tamanho inválido.\n\n' + mensagemTamanhos(cfg2));
+        await enviar(mensagemTamanhos(await getConfig()));
       }
       break;
 
     case 'bebida':
-      if (texto === 'não' || texto === 'nao') {
+      if (['não', 'nao'].includes(texto)) {
         sessao.finalizacao.bebida = 'Nenhuma';
-        const cfg3 = await getConfig();
-        await enviar(mensagemEntrega(cfg3));
+        await enviar(mensagemEntrega(await getConfig()));
         sessao.etapa = 'entrega';
       } else if (texto === 'sim') {
+        await enviar(mensagemBebidas(await getConfig()));
         sessao.etapa = 'escolher-bebida';
-        const cfg4 = await getConfig();
-        await enviar(mensagemBebidas(cfg4));
       } else {
-        await enviar('Por favor, responda com "sim" ou "não".');
+        await enviar('Responda com "sim" ou "não".');
       }
       break;
 
     case 'escolher-bebida':
       if (['1', '2', '3'].includes(texto)) {
-        const bebidas = { '1': 'Coca Lata', '2': 'Coca 1L', '3': 'Coca 2L' };
+        const bebidas = { 1: 'Coca Lata', 2: 'Coca 1L', 3: 'Coca 2L' };
         sessao.finalizacao.bebida = bebidas[texto];
-        const cfg5 = await getConfig();
-        await enviar(mensagemEntrega(cfg5));
+        await enviar(mensagemEntrega(await getConfig()));
         sessao.etapa = 'entrega';
       } else {
-        const cfg6 = await getConfig();
-        await enviar('Escolha inválida. Digite 1, 2 ou 3.\n\n' + mensagemBebidas(cfg6));
+        await enviar(mensagemBebidas(await getConfig()));
       }
       break;
 
     case 'entrega':
       if (['1', '2'].includes(texto)) {
-        const cfg7 = await getConfig();
-        if (texto === '1') {
-          sessao.finalizacao.tipoEntrega = 'Entrega';
-          sessao.finalizacao.taxaEntrega = Number(cfg7.taxaEntrega ?? 0);
-        } else {
-          sessao.finalizacao.tipoEntrega = 'Retirar';
-          sessao.finalizacao.taxaEntrega = 0;
-        }
+        const cfg = await getConfig();
+        sessao.finalizacao.tipoEntrega = texto === '1' ? 'Entrega' : 'Retirar';
+        sessao.finalizacao.taxaEntrega = texto === '1' ? cfg.taxaEntrega : 0;
         await enviar('Escolha a forma de pagamento:\n1. Dinheiro\n2. PIX\n3. Cartão');
         sessao.etapa = 'pagamento';
       } else {
-        const cfg8 = await getConfig();
-        await enviar('Opção inválida.\n\n' + mensagemEntrega(cfg8));
+        await enviar(mensagemEntrega(await getConfig()));
       }
       break;
 
     case 'pagamento':
       if (['1', '2', '3'].includes(texto)) {
-        const formas = { '1': 'Dinheiro', '2': 'PIX', '3': 'Cartão' };
+        const formas = { 1: 'Dinheiro', 2: 'PIX', 3: 'Cartão' };
         sessao.finalizacao.pagamento = formas[texto];
-
         const cfg = await getConfig();
-        const precos = cfg.precosMarmita;
-        const bebidaPrecoMap = {
-          'Nenhuma': 0,
-          'Coca Lata': Number(cfg.precosBebida?.lata ?? 0),
-          'Coca 1L': Number(cfg.precosBebida?.umLitro ?? 0),
-          'Coca 2L': Number(cfg.precosBebida?.doisLitros ?? 0),
-        };
+        const base = cfg.precosMarmita[sessao.finalizacao.tamanho];
+        const adicional = sessao.finalizacao.bebida === 'Nenhuma' ? 0 : cfg.precosBebida[
+          sessao.finalizacao.bebida === 'Coca Lata' ? 'lata' :
+          sessao.finalizacao.bebida === 'Coca 1L' ? 'umLitro' : 'doisLitros'
+        ];
+        const total = base + adicional + (sessao.finalizacao.taxaEntrega ?? 0);
 
-        const base = Number(precos[sessao.finalizacao.tamanho] ?? 0);
-        const adicional = bebidaPrecoMap[sessao.finalizacao.bebida] ?? 0;
-        const taxa = Number(sessao.finalizacao.taxaEntrega ?? 0);
-        const total = base + adicional + taxa;
-
-        sessao.finalizacao.total = total;
-
-        await enviar(
-          `🧾 Resumo do pedido:\n` +
-          `🍱 ${sessao.finalizacao.cardapio}\n` +
-          `📏 Tamanho: ${sessao.finalizacao.tamanho} (${moeda(base)})\n` +
-          `🥤 Bebida: ${sessao.finalizacao.bebida} (${moeda(adicional)})\n` +
-          (taxa > 0 ? `🚚 Entrega: ${moeda(taxa)}\n` : `🏬 Retirada no local\n`) +
-          `💰 Total: ${moeda(total)}\n` +
-          `Pagamento: ${sessao.finalizacao.pagamento}`
-        );
-
+        await enviar(`🧾 Resumo do pedido:\n${JSON.stringify(sessao.finalizacao, null, 2)}\nTotal: ${moeda(total)}`);
         await enviar('✅ Pedido confirmado! Sua marmita está sendo preparada.');
         await salvarPedido(sessao.finalizacao, remetente, msg.sender?.pushname);
         delete sessoes[remetente];
       } else {
-        await enviar('Escolha inválida. Digite 1, 2 ou 3.');
+        await enviar('Escolha inválida.');
       }
       break;
-
-    default:
-      await enviar('Não entendi. Por favor, digite "oi" para começar.');
-      delete sessoes[remetente];
   }
 }
 
-// ===================== APIs expostas =====================
+// ===================== APIs =====================
 export async function handleMensagemSimulada({ from, body }) {
   pushMsg(from, 'user', body);
   await processarMensagem(null, { from, body, sender: { pushname: 'Teste Simulado' } }, true);
 }
 
 export async function iniciarBot() {
-  wppconnect.create({
-    session: 'marmitex-teste2',
-    headless: false,
-    autoClose: 180,
-    browserArgs: ['--no-sandbox'],
-    catchQR: (_img, asciiQR) => {
-      console.log('⚠️ Escaneie o QR Code:', asciiQR);
-    },
-    statusFind: (statusSession) => {
-      console.log('📡 Status da sessão (marmitex-teste2):', statusSession);
-    }
-  }).then(client => {
-    console.log('🤖 Bot conectado e escutando mensagens.');
-    client.onMessage(async (msg) => {
-      await processarMensagem(client, msg);
+  try {
+    const client = await conectarWhatsapp(async (msg) => {
+      try {
+        await processarMensagem(client, msg);
+      } catch (e) {
+        console.error('❌ Erro crítico ao processar mensagem:', e);
+      }
     });
-  });
+    
+    console.log('🤖 Bot conectado e escutando mensagens.');
+  } catch (erro) {
+    console.error('❌ Erro fatal ao iniciar o bot:', erro);
+  }
 }
 
-// ===================== Persistência =====================
+process.on('unhandledRejection', (r) => console.error('⚠️ Unhandled Rejection:', r));
+
 async function salvarPedido(finalizacao, remetente, nome = '') {
   try {
-    const novo = new Pedido({
+    await new Pedido({
       cliente: { numero: remetente, nome },
-      cardapioEscolhido: finalizacao.cardapio,
-      tamanho: finalizacao.tamanho,
-      bebida: finalizacao.bebida,
-      formaPagamento: finalizacao.pagamento,
-      tipoEntrega: finalizacao.tipoEntrega || 'Entrega',
-      taxaEntrega: finalizacao.taxaEntrega || 0,
-      total: finalizacao.total,
-    });
-    await novo.save();
-    console.log('✅ Pedido salvo com sucesso no banco.');
+      ...finalizacao
+    }).save();
   } catch (erro) {
-    console.error('❌ Erro ao salvar pedido:', erro);
+    console.error('❌ Erro ao salvar pedido no banco de dados:', erro);
   }
 }

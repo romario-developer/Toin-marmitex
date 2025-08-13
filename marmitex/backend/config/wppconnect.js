@@ -2,7 +2,7 @@
 import wppconnect from '@wppconnect-team/wppconnect';
 import fs from 'fs';
 
-const SESSAO = 'marmitex-teste';
+const SESSAO = 'marmitex-bot';
 const TOKEN_PATH = `./tokens/${SESSAO}/token.json`;
 
 export async function conectarWhatsapp(callbackOnMessage) {

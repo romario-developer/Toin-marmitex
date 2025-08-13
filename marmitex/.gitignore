@@ -80,4 +80,4 @@ ehthumbs.db
 Desktop.ini
 
 # Ignorar tokens do WhatsApp WPPConnect
-marmitex/backend/tokens/
+marmitex/backend/tokens/backend/tokens/
