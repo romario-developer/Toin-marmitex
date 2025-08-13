@@ -1,70 +1,104 @@
+// marmitex/backend/config/wppconnect.js
+import wppconnect from 'wppconnect';
 
-import wppconnect from '@wppconnect-team/wppconnect';
-import fs from 'fs';
+let client = null;
+let clientPromise = null;
 
-const SESSAO = 'marmitex-bot';
-const TOKEN_PATH = `./tokens/${SESSAO}/token.json`;
-
-export async function conectarWhatsapp(callbackOnMessage) {
-  const tokenSalvo = carregarToken();
-
-  const client = await wppconnect.create({
-    session: SESSAO,
-    headless: false,
-    autoClose: 0,
-    browserArgs: ['--no-sandbox'],
-    catchQR: (base64Qrimg, asciiQR, attempts, urlCode) => {
-      console.log('⚠️ Escaneie o QR Code no WhatsApp:\n', asciiQR);
-    },
-    statusFind: (statusSession, session) => {
-      console.log(`💬 Status da sessão (${session}):`, statusSession);
-    },
-    browserSessionToken: tokenSalvo ?? undefined,
-    disableWelcome: true,
-    updatesLog: false
-  });
-
-  client.onStateChange((state) => {
-  console.log('📡 State changed:', state);
-  if (state === 'CONFLICT') {
-    console.log('⚠️ CONFLITO! Forçando uso aqui...');
-    client.useHere();
-  }
-  if (state === 'UNPAIRED') {
-    console.log('🚫 Sessão desvinculada do WhatsApp!');
-  }
-  if (state === 'UNLAUNCHED') {
-    console.log('⚠️ Cliente não iniciou corretamente');
-  }
-});
-
-
-  console.log('✅ Conectado ao WhatsApp!');
-
-  salvarToken(client);
-
-  // Escuta mensagens
-  client.onMessage(callbackOnMessage);
-
+/**
+ * Retorna a instância atual do cliente (ou null se ainda não inicializado).
+ */
+export function getClient() {
   return client;
 }
 
-function carregarToken() {
-  try {
-    const raw = fs.readFileSync(TOKEN_PATH, 'utf-8');
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
+/**
+ * Inicializa e retorna o cliente do WPPConnect.
+ * Chame uma vez no bootstrap do servidor e reutilize via getClient().
+ */
+export async function initWpp(options = {}) {
+  if (client) return client;
+  if (clientPromise) return clientPromise;
 
-function salvarToken(client) {
-  client.onStreamChange(async (state) => {
-    if (state === 'CONNECTED') {
-      const token = await client.getSessionTokenBrowser();
-      fs.mkdirSync('./tokens/marmitex-bot', { recursive: true });
-      fs.writeFileSync(TOKEN_PATH, JSON.stringify(token), 'utf-8');
-      console.log('💾 Token de sessão salvo!');
-    }
-  });
+  const session = process.env.WPP_SESSION || 'marmitex-bot';
+
+  const createOptions = {
+    session,
+    // Evita animações de terminal e ruído desnecessário
+    disableSpins: true,
+    disableWelcome: true,
+    debug: false,
+    logQR: true, // Mostra QR no terminal (útil em desenvolvimento)
+    autoClose: false, // não fecha automaticamente
+    waitForLogin: true,
+
+    catchQR: (qr, asciiQR, attempts) => {
+      console.log('📲 QRCode gerado. Tentativas:', attempts ?? 0);
+      console.log(asciiQR); // QR em ASCII no terminal
+    },
+
+    statusFind: (status, sess) => {
+      console.log(`📡 Status da sessão [${sess}]:`, status);
+    },
+
+    // Opções do Puppeteer/Chromium
+    browserArgs: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu',
+    ],
+    puppeteerOptions: {
+      headless: true, // em servidor/produção, deixe true
+    },
+  };
+
+  clientPromise = wppconnect
+    .create(createOptions)
+    .then((cli) => {
+      client = cli;
+
+      // Eventos úteis
+      client.onStateChange((state) => {
+        console.log('🔄 Novo estado da sessão:', state);
+        // Tratativa de conflito (web aberta em outro lugar)
+        if (state === 'CONFLICT' || state === 'DISCONNECTED') {
+          client.useHere();
+        }
+        // Caso fique "UNPAIRED" (despareado), loga pra facilitar o scan de novo
+        if (state === 'UNPAIRED') {
+          console.log('🔴 SESSÃO DESPAREADA! Escaneie o QR Code novamente.');
+        }
+      });
+
+      client.onStreamChange((stream) => {
+        console.log('🌐 Estado do stream:', stream);
+      });
+
+      // Alguns ambientes disparam esse evento
+      client.onBattery((level, charging) => {
+        console.log(`🔋 Bateria do dispositivo: ${level}% | Carregando: ${charging}`);
+      });
+
+      // Se quiser inspecionar mudanças de interface (útil em debug)
+      if (typeof client.onInterfaceChange === 'function') {
+        client.onInterfaceChange((change) => {
+          console.log('🖥️ Interface change:', change);
+        });
+      }
+
+      console.log('✅ WPPConnect iniciado com sessão:', session);
+      return client;
+    })
+    .catch((err) => {
+      console.error('❌ Erro ao iniciar WPPConnect:', err);
+      client = null;
+      clientPromise = null;
+      throw err;
+    });
+
+  return clientPromise;
 }
