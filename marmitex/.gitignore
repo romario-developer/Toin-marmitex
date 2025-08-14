@@ -1,83 +1,25 @@
-# Node.js
+# ——— Node / build
 node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Logs
-logs/
+marmitex/**/node_modules/
+dist/
+build/
+coverage/
 *.log
+npm-debug.log*
+.yarn/*
+.pnpm-store/*
 
-# Runtime data
-pids/
-*.pid
-*.seed
-*.pid.lock
-
-# Environment variables
+# ——— Env
 .env
 .env.*
 
-# Build output
-dist/
-build/
-.next/
-out/
-
-# Vite
-.vite/
-
-# Coverage reports
-coverage/
-
-# OS system files
-.DS_Store
-Thumbs.db
-
-# VSCode settings
-.vscode/
-
-# Local database or cache
-*.sqlite
-*.sqlite3
-*.db
-*.db3
-*.realm
-*.ldb
-*.bak
-*.tmp
-
-# TypeScript cache
-*.tsbuildinfo
-
-# SASS cache
-.sass-cache/
-
-# Optional npm cache directory
-.npm/
-
-# ESLint cache
-.eslintcache
-
-# Mac trash
-.Trashes
-
-# JetBrains IDEs
-.idea/
-
-# Local uploads or static files
-uploads/
-public/uploads/
-static/uploads/
-
-# React Native / Expo
-.expo/
-.expo-shared/
-
-# Windows system files
-ehthumbs.db
-Desktop.ini
-
-# Ignorar tokens do WhatsApp WPPConnect
-marmitex/backend/tokens/backend/tokens/
+# ——— WPPConnect / Puppeteer / Chrome profile & cache
+marmitex/backend/.wpp-session/
+marmitex/backend/.wppconnect/
+marmitex/backend/tokens/
+marmitex/backend/**/Cache/
+marmitex/backend/**/Code Cache/
+marmitex/backend/**/GPUCache/
+marmitex/backend/**/Crashpad/
+marmitex/backend/**/Media Cache/
+marmitex/backend/**/Default/

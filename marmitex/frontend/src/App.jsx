@@ -14,18 +14,7 @@ export default function App() {
         {/* público */}
         <Route path="/login" element={<Login onSuccess={() => window.location.replace('/cardapio')} />} />
 
-        {/* protegido */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <NavBar />
-            </ProtectedRoute>
-          }
-        >
-          <Route index element={<Navigate to="/cardapio" replace />} />
-        </Route>
-
+        {/* protegidos */}
         <Route
           path="/cardapio"
           element={
@@ -37,7 +26,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/pedidos"
           element={
@@ -49,7 +37,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/config"
           element={
@@ -61,7 +48,6 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
         <Route
           path="/simulador"
           element={
@@ -74,7 +60,8 @@ export default function App() {
           }
         />
 
-        {/* fallback */}
+        {/* redirects */}
+        <Route path="/" element={<Navigate to="/cardapio" replace />} />
         <Route path="*" element={<Navigate to="/cardapio" replace />} />
       </Routes>
     </div>

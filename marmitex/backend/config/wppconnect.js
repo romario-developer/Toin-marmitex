@@ -1,104 +1,86 @@
-// marmitex/backend/config/wppconnect.js
-import wppconnect from 'wppconnect';
+// backend/config/wppconnect.js
+import wppconnect from '@wppconnect-team/wppconnect';
+import path from 'path';
+import fs from 'fs';
 
-let client = null;
-let clientPromise = null;
+let _clientPromise = null;
+let _client = null;
 
-/**
- * Retorna a instância atual do cliente (ou null se ainda não inicializado).
- */
+const SESSION_DIR = path.resolve('./.wpp-session'); // pasta para persistir login
+
+export async function initWpp() {
+  if (_clientPromise) return _clientPromise;
+
+  if (!fs.existsSync(SESSION_DIR)) fs.mkdirSync(SESSION_DIR, { recursive: true });
+
+  _clientPromise = wppconnect.create({
+    session: 'marmitex-bot',
+    autoClose: 0,                // nunca fecha sozinho
+    headless: true,
+    useChrome: true,
+    logQR: true,
+    disableWelcome: true,
+    deviceName: 'Marmitex Bot',
+    updatesLog: true,
+    puppeteerOptions: {
+      userDataDir: SESSION_DIR,  // <- persiste a sessão (não precisa reler QR toda vez)
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
+    catchQR: (_base64, asciiQR) => {
+      console.log('📲 QRCode gerado.');
+      if (asciiQR) console.log(asciiQR);
+    },
+    statusFind: (status) => console.log('📡 Status da sessão:', status),
+    onLoadingScreen: (percent, message) => console.log('⌛', percent, message),
+  }).then((client) => {
+    _client = client;
+
+    client.onStateChange((state) => {
+      console.log('🔄 Novo estado da sessão:', state);
+    });
+    client.onStreamChange((state) => {
+      console.log('🌐 Estado do stream:', state);
+    });
+    client.onInterfaceChange((ui) => {
+      // ui.status: QR | SYNCING | MAIN | etc.
+      console.log('🖥️ UI:', ui?.status, '(', ui?.mode || 'UNKNOWN', ')');
+    });
+
+    return client;
+  });
+
+  return _clientPromise;
+}
+
 export function getClient() {
-  return client;
+  return _client;
 }
 
 /**
- * Inicializa e retorna o cliente do WPPConnect.
- * Chame uma vez no bootstrap do servidor e reutilize via getClient().
+ * Espera conexão, mas NÃO lança erro.
+ * Retorna true se conectou dentro do prazo; false caso contrário.
  */
-export async function initWpp(options = {}) {
-  if (client) return client;
-  if (clientPromise) return clientPromise;
+export async function waitUntilReady(maxMs = 180000) {
+  const client = await initWpp();
 
-  const session = process.env.WPP_SESSION || 'marmitex-bot';
+  // caminho rápido
+  try {
+    const state = await client.getConnectionState();
+    if (state === 'CONNECTED') return true;
+  } catch (_) {}
 
-  const createOptions = {
-    session,
-    // Evita animações de terminal e ruído desnecessário
-    disableSpins: true,
-    disableWelcome: true,
-    debug: false,
-    logQR: true, // Mostra QR no terminal (útil em desenvolvimento)
-    autoClose: false, // não fecha automaticamente
-    waitForLogin: true,
+  return await new Promise((resolve) => {
+    const start = Date.now();
 
-    catchQR: (qr, asciiQR, attempts) => {
-      console.log('📲 QRCode gerado. Tentativas:', attempts ?? 0);
-      console.log(asciiQR); // QR em ASCII no terminal
-    },
+    const tick = async () => {
+      try {
+        const s = await client.getConnectionState();
+        if (s === 'CONNECTED') return resolve(true);
+      } catch (_) {}
+      if (Date.now() - start > maxMs) return resolve(false); // nunca rejeita
+      setTimeout(tick, 1000);
+    };
 
-    statusFind: (status, sess) => {
-      console.log(`📡 Status da sessão [${sess}]:`, status);
-    },
-
-    // Opções do Puppeteer/Chromium
-    browserArgs: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu',
-    ],
-    puppeteerOptions: {
-      headless: true, // em servidor/produção, deixe true
-    },
-  };
-
-  clientPromise = wppconnect
-    .create(createOptions)
-    .then((cli) => {
-      client = cli;
-
-      // Eventos úteis
-      client.onStateChange((state) => {
-        console.log('🔄 Novo estado da sessão:', state);
-        // Tratativa de conflito (web aberta em outro lugar)
-        if (state === 'CONFLICT' || state === 'DISCONNECTED') {
-          client.useHere();
-        }
-        // Caso fique "UNPAIRED" (despareado), loga pra facilitar o scan de novo
-        if (state === 'UNPAIRED') {
-          console.log('🔴 SESSÃO DESPAREADA! Escaneie o QR Code novamente.');
-        }
-      });
-
-      client.onStreamChange((stream) => {
-        console.log('🌐 Estado do stream:', stream);
-      });
-
-      // Alguns ambientes disparam esse evento
-      client.onBattery((level, charging) => {
-        console.log(`🔋 Bateria do dispositivo: ${level}% | Carregando: ${charging}`);
-      });
-
-      // Se quiser inspecionar mudanças de interface (útil em debug)
-      if (typeof client.onInterfaceChange === 'function') {
-        client.onInterfaceChange((change) => {
-          console.log('🖥️ Interface change:', change);
-        });
-      }
-
-      console.log('✅ WPPConnect iniciado com sessão:', session);
-      return client;
-    })
-    .catch((err) => {
-      console.error('❌ Erro ao iniciar WPPConnect:', err);
-      client = null;
-      clientPromise = null;
-      throw err;
-    });
-
-  return clientPromise;
+    tick();
+  });
 }

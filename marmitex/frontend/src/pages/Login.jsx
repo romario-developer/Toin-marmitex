@@ -1,35 +1,60 @@
-// admin/src/pages/Login.jsx
+// frontend/src/pages/Login.jsx
 import { useState } from 'react';
-import { api } from '../api';
+import { apiLogin } from '../services/api';
 
-export default function Login({ onSuccess }) {
+export default function Login() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
-  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState('');
 
   async function entrar(e) {
     e.preventDefault();
-    setMsg('');
+    setErro('');
+    setLoading(true);
     try {
-      const { data } = await api.post('/api/auth/login', { email, senha });
-      localStorage.setItem('adm_token', data.token);
-      localStorage.setItem('adm_email', data.email);
-      onSuccess?.();
-    } catch (e) {
-      setMsg('❌ Login inválido');
+      await apiLogin({ email, senha }); // já salva o token no localStorage
+      window.location.replace('/');     // vai para o painel
+    } catch (err) {
+      console.error(err);
+      setErro('E-mail ou senha inválidos.');
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <form onSubmit={entrar} className="w-full max-w-sm bg-white p-6 rounded shadow">
-        <h1 className="text-xl font-bold mb-4 text-center">Login Admin</h1>
-        {msg && <p className="text-sm mb-3">{msg}</p>}
-        <label className="block text-sm font-medium mb-1">Email</label>
-        <input className="w-full border rounded px-3 py-2 mb-3" value={email} onChange={e=>setEmail(e.target.value)} />
-        <label className="block text-sm font-medium mb-1">Senha</label>
-        <input type="password" className="w-full border rounded px-3 py-2 mb-4" value={senha} onChange={e=>setSenha(e.target.value)} />
-        <button className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Entrar</button>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <form onSubmit={entrar} className="bg-white p-6 rounded shadow w-full max-w-sm">
+        <h1 className="text-xl font-semibold mb-4">Login</h1>
+
+        <label className="block text-sm mb-1">E-mail</label>
+        <input
+          className="w-full border rounded px-3 py-2 mb-3"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          type="email"
+          required
+        />
+
+        <label className="block text-sm mb-1">Senha</label>
+        <input
+          className="w-full border rounded px-3 py-2 mb-4"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          type="password"
+          required
+        />
+
+        {erro && <div className="text-red-600 text-sm mb-3">{erro}</div>}
+
+        <button
+          className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60"
+          disabled={loading}
+          type="submit"
+        >
+          {loading ? 'Entrando...' : 'Entrar'}
+        </button>
       </form>
     </div>
   );
