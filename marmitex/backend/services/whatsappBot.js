@@ -1,4 +1,7 @@
-import { initWpp, startClient, getClient, waitUntilReady } from '../config/wppconnect.js';
+// backend/services/whatsappBot.js
+// ESM - compatível com o server.js (injeta o client no init)
+
+import { waitUntilReady } from '../config/wppconnect.js';
 import Pedido from '../models/Pedido.js';
 
 /* ======================= GATES ANTI-STATUS/BROADCAST/GRUPO ======================= */
@@ -83,8 +86,8 @@ function isNavError(err) {
 
 /* =================== Envio com GATE + Retry =================== */
 async function enviarMensagem(client, telefone, texto) {
-  const ok = await waitUntilReady(180000); // até 3 min pra conectar/parear
-  if (!ok) throw new Error('Cliente não conectou (aguarde ler o QR no console).');
+  const ok = await waitUntilReady(client, 180000); // até 3 min pra conectar/parear
+  if (!ok) throw new Error('Cliente não conectou (aguarde ler o QR).');
 
   let attempt = 0;
   const max = 5;
@@ -98,7 +101,7 @@ async function enviarMensagem(client, telefone, texto) {
       const wait = 300 * attempt;
       console.warn(`sendText falhou por navegação (tentativa ${attempt}/${max}). Aguardar ${wait}ms...`);
       await new Promise((r) => setTimeout(r, wait));
-      await waitUntilReady(60000);
+      await waitUntilReady(client, 60000);
     }
   }
 }
@@ -359,13 +362,20 @@ async function processarMensagem(clientOrFn, telefone, texto) {
   }
 }
 
-/* =================== WhatsApp real =================== */
-export async function startMarmitexBot() {
-  // inicia o client sem travar se estiver UNPAIRED (vai mostrar o QR no console)
-  await startClient().catch((e) => console.warn('startClient aviso:', e?.message || e));
+/* =================== Bootstrap chamado pelo server.js =================== */
+/**
+ * Export default compatível com o server.js:
+ * Ele injeta o `client` já criado e logado.
+ */
+export default async function initBot(client) {
+  console.log('🤖 Bot Marmitex: iniciando listeners...');
 
-  const client = getClient();
-  if (!client) throw new Error('WPPConnect não inicializado corretamente.');
+  // Evita listeners duplicados em hot-reload/start múltiplos
+  if (client.__marmitexListenersMounted) {
+    console.log('ℹ️ Bot Marmitex: listeners já montados; ignorando repetição.');
+    return;
+  }
+  client.__marmitexListenersMounted = true;
 
   client.onMessage(async (message) => {
     try {
@@ -384,11 +394,15 @@ export async function startMarmitexBot() {
     }
   });
 
-  console.log('🤖 Bot Marmitex carregado e ouvindo mensagens...');
-}
+  // Logs úteis
+  if (typeof client.onStateChange === 'function') {
+    client.onStateChange((s) => console.log('🤖 [bot] onStateChange:', s));
+  }
+  if (typeof client.onStreamChange === 'function') {
+    client.onStreamChange((s) => console.log('🤖 [bot] onStreamChange:', s));
+  }
 
-export async function iniciarBot() {
-  await startMarmitexBot();
+  console.log('✅ Bot Marmitex: listeners prontos.');
 }
 
 /* =================== Simulador (painel) =================== */
