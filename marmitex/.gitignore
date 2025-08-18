@@ -1,5 +1,60 @@
-# ——— Node / build
+# Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+logs/
+*.log
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Build outputs
+build/
+dist/
+
+# WhatsApp tokens e QR codes (IMPORTANTE!)
+marmitex/backend/backend/qr/
+marmitex/backend/backend/wpp-tokens/
+*.data.json
+
+# Uploads (opcional - se quiser versionar as imagens, remova esta linha)
+marmitex/backend/uploads/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 marmitex/**/node_modules/
 dist/
 build/
@@ -8,18 +63,3 @@ coverage/
 npm-debug.log*
 .yarn/*
 .pnpm-store/*
-
-# ——— Env
-.env
-.env.*
-
-# ——— WPPConnect / Puppeteer / Chrome profile & cache
-marmitex/backend/.wpp-session/
-marmitex/backend/.wppconnect/
-marmitex/backend/tokens/
-marmitex/backend/**/Cache/
-marmitex/backend/**/Code Cache/
-marmitex/backend/**/GPUCache/
-marmitex/backend/**/Crashpad/
-marmitex/backend/**/Media Cache/
-marmitex/backend/**/Default/
