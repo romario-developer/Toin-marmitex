@@ -1,5 +1,10 @@
 {
   "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "create-admin": "node createAdmin.js"
+  },
   "dependencies": {
     "@wppconnect-team/wppconnect": "^1.37.3",
     "bcryptjs": "^3.0.2",
@@ -10,6 +15,7 @@
     "mongoose": "^8.17.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
     "puppeteer": "^24.16.2",
     "qrcode-terminal": "^0.12.0"
   }

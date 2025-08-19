@@ -6,7 +6,7 @@ const PedidoSchema = new mongoose.Schema(
     telefone: { type: String, required: true, index: true },
     cardapio: {
       tipo: { type: String, enum: ['CARDÁPIO 1', 'CARDÁPIO 2'], required: true },
-      itens: [{ type: String }], // opcional: descrever os pratos escolhidos
+      itens: [{ type: String }],
     },
     tamanho: { type: String, enum: ['P', 'M', 'G'], required: true },
     bebida: { type: String, enum: ['Coca Lata', 'Coca 1L', 'Coca 2L', 'Não'], required: true },
@@ -15,6 +15,15 @@ const PedidoSchema = new mongoose.Schema(
     statusPagamento: { type: String, enum: ['pendente', 'pago', 'nao_aplicavel'], default: 'nao_aplicavel' },
     status: { type: String, enum: ['em_preparo', 'finalizado'], default: 'em_preparo' },
     observacoes: { type: String },
+    // 🆕 Novos campos para PIX
+    pixData: {
+      transactionId: String,
+      qrCode: String,
+      qrCodeBase64: String,
+      paymentLink: String,
+      expiresAt: Date,
+      mercadoPagoId: String
+    }
   },
   { timestamps: true }
 );

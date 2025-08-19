@@ -1,3 +1,5 @@
-2025/08/16-13:39:14.925 5c38 Reusing MANIFEST C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\backend\wpp-tokens\marmitex-bot\Default\Local Storage\leveldb/MANIFEST-000001
-2025/08/16-13:39:14.933 5c38 Recovering log #4
-2025/08/16-13:39:14.937 5c38 Reusing old log C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\backend\wpp-tokens\marmitex-bot\Default\Local Storage\leveldb/000004.log 
+2025/08/19-17:22:27.356 2718 Reusing MANIFEST C:\Users\Tina\Documents\prog\Toin-marmitex\marmitex\backend\backend\wpp-tokens\marmitex-bot\Default\Local Storage\leveldb/MANIFEST-000001
+2025/08/19-17:22:27.366 2718 Recovering log #12
+2025/08/19-17:22:27.366 2718 Level-0 table #16: started
+2025/08/19-17:22:27.373 2718 Level-0 table #16: 17618 bytes OK
+2025/08/19-17:22:27.378 2718 Delete type=0 #12

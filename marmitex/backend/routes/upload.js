@@ -1,22 +1,12 @@
 // backend/routes/upload.js
 import express from 'express';
 import multer from 'multer';
-import path from 'path';
 import fs from 'fs';
 
 const router = express.Router();
 
-const UPLOAD_DIR = path.resolve('uploads');
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname) || '.jpg';
-    const name = file.fieldname + '-' + Date.now() + ext;
-    cb(null, name);
-  }
-});
+// Armazenar em memória para converter para base64
+const storage = multer.memoryStorage();
 
 const upload = multer({
   storage,
@@ -28,8 +18,25 @@ const upload = multer({
 });
 
 router.post('/', upload.single('file'), (req, res) => {
-  // retorna URL relativa para salvar no cardápio
-  res.json({ url: `/uploads/${req.file.filename}` });
+  try {
+    if (!req.file) {
+      return res.status(400).json({ erro: 'Nenhum arquivo enviado' });
+    }
+
+    // Converter para base64
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+    
+    res.json({ 
+      url: dataUrl,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+      size: req.file.size
+    });
+  } catch (error) {
+    console.error('Erro no upload:', error);
+    res.status(500).json({ erro: 'Erro interno do servidor' });
+  }
 });
 
 export default router;

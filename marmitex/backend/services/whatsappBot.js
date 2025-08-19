@@ -232,6 +232,23 @@ async function processarMensagem(clientOrFn, telefone, texto) {
       return;
     }
 
+    // 🆕 Detectar mensagens de agradecimento
+    const agradecimentos = ['obrigado', 'obrigada', 'obg', 'vlw', 'valeu', 'muito obrigado', 'muito obrigada', 'brigado', 'brigada'];
+    if (agradecimentos.some(palavra => tNorm.includes(palavra))) {
+      const respostasAgradecimento = [
+        '😊 Por nada! Foi um prazer atendê-lo(a)!',
+        '🙏 Muito obrigado pela preferência! Volte sempre!',
+        '😄 Fico feliz em ajudar! Até a próxima!',
+        '🤗 De nada! Esperamos você novamente em breve!',
+        '✨ Obrigado pela confiança! Tenha um ótimo dia!'
+      ];
+      
+      // Escolher uma resposta aleatória
+      const respostaAleatoria = respostasAgradecimento[Math.floor(Math.random() * respostasAgradecimento.length)];
+      await enviar(clientOrFn, telefone, respostaAleatoria);
+      return;
+    }
+
     switch (sessao.etapa) {
       case 'inicio':
         // Mensagem de boas-vindas primeiro
@@ -300,7 +317,8 @@ async function processarMensagem(clientOrFn, telefone, texto) {
           
           sessao.dados.cardapio = {
             opcao: tNorm,
-            tipo: tNorm === '1' ? cardapio.cardapio1.descricao : cardapio.cardapio2.descricao
+            tipo: tNorm === '1' ? 'CARDÁPIO 1' : 'CARDÁPIO 2',  // ✅ CORRETO: valores do enum
+            descricao: tNorm === '1' ? cardapio.cardapio1.descricao : cardapio.cardapio2.descricao  // Descrição separada
           };
 
           sessao.etapa = 'tamanho';
@@ -578,5 +596,102 @@ export function getConversa() {
 export function resetConversa() {
   SIM_CONVERSA.length = 0;
   resetSessao(SIM_TEL);
+}
+
+/* =================== Funções de Pedido =================== */
+
+// Função para finalizar e salvar pedido no banco
+async function finalizarPedido(clientOrFn, telefone, sessao) {
+  try {
+    const pedidoData = {
+      telefone: telefone,
+      cardapio: {
+        tipo: sessao.dados.cardapio.tipo,  // Agora será 'CARDÁPIO 1' ou 'CARDÁPIO 2'
+        itens: [sessao.dados.cardapio.descricao]  // Descrição vai para itens
+      },
+      tamanho: sessao.dados.tamanho,
+      bebida: sessao.dados.bebida,
+      formaPagamento: sessao.dados.formaPagamento,
+      total: sessao.dados.precoTotal,
+      statusPagamento: sessao.dados.formaPagamento === 'PIX' ? 'pendente' : 'nao_aplicavel',
+      status: 'em_preparo',
+      observacoes: sessao.dados.troco ? `Troco para: ${sessao.dados.troco}` : ''
+    };
+
+    // Se for PIX, criar dados do pagamento
+    if (sessao.dados.formaPagamento === 'PIX') {
+      try {
+        const pixData = await criarPagamentoPIX({
+          _id: 'temp', // Será substituído pelo ID real
+          total: sessao.dados.precoTotal,
+          cardapio: { tipo: sessao.dados.cardapio.tipo }
+        });
+        pedidoData.pixData = pixData;
+      } catch (pixError) {
+        console.warn('⚠️ Erro ao criar PIX, salvando pedido sem dados PIX:', pixError.message);
+      }
+    }
+
+    const pedido = await Pedido.create(pedidoData);
+    console.log(`✅ Pedido salvo: ${pedido._id}`);
+    
+    return pedido;
+  } catch (error) {
+    console.error('❌ Erro ao finalizar pedido:', error.message);
+    throw error;
+  }
+}
+
+// Função para enviar informações do PIX
+async function enviarPIXComBotao(clientOrFn, telefone, pedido) {
+  try {
+    if (pedido.pixData && pedido.pixData.qrCode) {
+      const mensagemPIX = `🔑 *PIX para Pagamento*\n\n` +
+        `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
+        `📋 Pedido: ${pedido._id}\n\n` +
+        `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
+        `⏰ Válido por 30 minutos\n\n` +
+        `Após pagar, o sistema confirmará automaticamente!`;
+      
+      await enviar(clientOrFn, telefone, mensagemPIX);
+    } else {
+      // Fallback se não tiver dados do Mercado Pago
+      const mensagemPIXSimples = `🔑 *PIX para Pagamento*\n\n` +
+        `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
+        `📋 Pedido: ${pedido._id}\n\n` +
+        `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
+        `Após pagar, envie "paguei" para confirmar!`;
+      
+      await enviar(clientOrFn, telefone, mensagemPIXSimples);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao enviar PIX:', error.message);
+    // Enviar mensagem de fallback
+    await enviar(clientOrFn, telefone, 
+      `✅ Pedido confirmado!\nForma de pagamento: PIX\nEntraremos em contato para finalizar o pagamento.`
+    );
+  }
+}
+
+// Função para enviar confirmação automática (usada pelo webhook)
+export async function enviarMensagemConfirmacao(telefone, pedido) {
+  try {
+    // Esta função será chamada pelo webhook quando o pagamento for confirmado
+    const mensagem = `✅ *Pagamento Confirmado!*\n\n` +
+      `📋 Pedido: ${pedido._id}\n` +
+      `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n\n` +
+      `🍛 Sua marmita já está sendo preparada!\n` +
+      `⏰ Tempo estimado: 20-30 minutos`;
+    
+    // Aqui você precisará ter acesso ao cliente WhatsApp
+    // Por enquanto, apenas log
+    console.log(`📱 Confirmação automática para ${telefone}: ${mensagem}`);
+    
+    // TODO: Implementar envio real quando o webhook for ativado
+    // await client.sendText(telefone, mensagem);
+    
+  } catch (error) {
+    console.error('❌ Erro ao enviar confirmação:', error.message);
+  }
 }
       

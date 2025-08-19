@@ -1,6 +1,7 @@
 // backend/utils/responderMensagem.js
 import { conversasAtivas, resetarConversa } from './conversasAtivas.js';
 import { obterCardapioAtual } from '../controllers/cardapioController.js';
+import Configuracao from '../models/Configuracao.js';
 
 export async function responderMensagem(client, message) {
   if (!message || !message.from || !message.body) {
@@ -18,14 +19,21 @@ export async function responderMensagem(client, message) {
   }
 
   const estado = conversasAtivas.get(numero);
+  
+  // Carregar cardápio e configurações
   const cardapio = await obterCardapioAtual();
+  const config = await Configuracao.findOne();
+  
+  if (!cardapio || !config) {
+    return client.sendText(numero, '❌ Desculpe, o cardápio não está disponível no momento. Tente novamente mais tarde.');
+  }
 
   if (texto === 'oi' || estado.etapa === 'inicio') {
     resetarConversa(numero);
     const textoCardapio = `🍽️ *Cardápio de Hoje* 🍽️
 
-📋 *Cardápio 1*: ${cardapio.cardapio1}
-📋 *Cardápio 2*: ${cardapio.cardapio2}
+📋 *Cardápio 1*: ${cardapio.cardapio1.descricao}
+📋 *Cardápio 2*: ${cardapio.cardapio2.descricao}
 
 Digite o número do cardápio desejado:
 1️⃣ Cardápio 1
@@ -40,16 +48,16 @@ Digite o número do cardápio desejado:
     estado.etapa = 'tamanho';
     return client.sendText(numero, `Escolha o tamanho da marmita:
 
-1️⃣ Pequena - R$ ${cardapio.precoP.toFixed(2).replace('.', ',')}
-2️⃣ Média - R$ ${cardapio.precoM.toFixed(2).replace('.', ',')}
-3️⃣ Grande - R$ ${cardapio.precoG.toFixed(2).replace('.', ',')}`);
+1️⃣ Pequena - R$ ${config.precosMarmita.P.toFixed(2).replace('.', ',')}
+2️⃣ Média - R$ ${config.precosMarmita.M.toFixed(2).replace('.', ',')}
+3️⃣ Grande - R$ ${config.precosMarmita.G.toFixed(2).replace('.', ',')}`);
   }
 
   if (estado.etapa === 'tamanho' && ['1', '2', '3'].includes(texto)) {
     const tamanhos = {
-      '1': { nome: 'Pequena', valor: cardapio.precoP },
-      '2': { nome: 'Média', valor: cardapio.precoM },
-      '3': { nome: 'Grande', valor: cardapio.precoG }
+      '1': { nome: 'Pequena', valor: config.precosMarmita.P },
+      '2': { nome: 'Média', valor: config.precosMarmita.M },
+      '3': { nome: 'Grande', valor: config.precosMarmita.G }
     };
 
     estado.tamanho = tamanhos[texto].nome;
@@ -63,9 +71,9 @@ Digite o número do cardápio desejado:
     if (texto === 'sim') {
       estado.etapa = 'escolherBebida';
       return client.sendText(numero, `Escolha sua bebida:
-1️⃣ Coca Lata - R$ ${cardapio.precoCocaLata.toFixed(2).replace('.', ',')}
-2️⃣ Coca 1L - R$ ${cardapio.precoCoca1L.toFixed(2).replace('.', ',')}
-3️⃣ Coca 2L - R$ ${cardapio.precoCoca2L.toFixed(2).replace('.', ',')}`);
+1️⃣ Coca Lata - R$ ${config.precosBebida.lata.toFixed(2).replace('.', ',')}
+2️⃣ Coca 1L - R$ ${config.precosBebida.umLitro.toFixed(2).replace('.', ',')}
+3️⃣ Coca 2L - R$ ${config.precosBebida.doisLitros.toFixed(2).replace('.', ',')}`);
     } else if (texto === 'não') {
       estado.bebida = 'Nenhuma';
       estado.etapa = 'confirmar';
@@ -76,9 +84,9 @@ Digite o número do cardápio desejado:
 
   if (estado.etapa === 'escolherBebida' && ['1', '2', '3'].includes(texto)) {
     const bebidas = {
-      '1': { nome: 'Coca Lata', valor: cardapio.precoCocaLata },
-      '2': { nome: 'Coca 1L', valor: cardapio.precoCoca1L },
-      '3': { nome: 'Coca 2L', valor: cardapio.precoCoca2L }
+      '1': { nome: 'Coca Lata', valor: config.precosBebida.lata },
+      '2': { nome: 'Coca 1L', valor: config.precosBebida.umLitro },
+      '3': { nome: 'Coca 2L', valor: config.precosBebida.doisLitros }
     };
 
     const bebidaEscolhida = bebidas[texto];

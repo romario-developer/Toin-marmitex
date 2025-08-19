@@ -4,7 +4,16 @@ import Cardapio from '../models/Cardapio.js';
 // POST /api/cardapios  -> cria para a data informada (bloqueia duplicado no mesmo dia)
 export const salvarCardapio = async (req, res) => {
   try {
-    const dataReq = req.body.data ? new Date(req.body.data) : new Date();
+    // Corrigir o processamento da data para evitar problemas de timezone
+    let dataReq;
+    if (req.body.data) {
+      // Se a data vier como string "YYYY-MM-DD", criar a data no timezone local
+      const [ano, mes, dia] = req.body.data.split('-').map(Number);
+      dataReq = new Date(ano, mes - 1, dia); // mes-1 porque Date() usa 0-11 para meses
+    } else {
+      dataReq = new Date();
+    }
+    
     const inicio = new Date(dataReq);
     inicio.setHours(0, 0, 0, 0);
     const fim = new Date(inicio); fim.setDate(fim.getDate() + 1);
@@ -30,14 +39,21 @@ export const salvarCardapio = async (req, res) => {
 // GET /api/cardapios/hoje  -> ainda existe para o BOT; se não quiser usar no admin, ignore
 export const obterCardapioAtual = async (_req, res) => {
   try {
+    // Criar data de hoje no início do dia (00:00:00)
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    // Criar data de amanhã no início do dia
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
     const cardapio = await Cardapio.findOne({
-      $expr: {
-        $eq: [
-          { $dateTrunc: { date: "$data", unit: "day", timezone: "America/Bahia" } },
-          { $dateTrunc: { date: "$$NOW", unit: "day", timezone: "America/Bahia" } }
-        ]
+      data: {
+        $gte: hoje,
+        $lt: amanha
       }
     });
+    
     if (!cardapio) return res.status(404).json({ mensagem: 'Nenhum cardápio encontrado para hoje.' });
     res.json(cardapio);
   } catch (e) {
@@ -114,8 +130,15 @@ export const obterCardapioPorId = async (req, res) => {
 export const atualizarCardapioPorId = async (req, res) => {
   try {
     const payload = {
-      // se vier "data", normaliza para 00:00
-      ...(req.body.data ? { data: (() => { const d = new Date(req.body.data); d.setHours(0,0,0,0); return d; })() } : {}),
+      // Corrigir o processamento da data aqui também
+      ...(req.body.data ? { 
+        data: (() => { 
+          const [ano, mes, dia] = req.body.data.split('-').map(Number);
+          const d = new Date(ano, mes - 1, dia);
+          d.setHours(0, 0, 0, 0); 
+          return d; 
+        })()
+      } : {}),
       cardapio1: { descricao: req.body.cardapio1?.descricao || '', imagem: req.body.cardapio1?.imagem || '' },
       cardapio2: { descricao: req.body.cardapio2?.descricao || '', imagem: req.body.cardapio2?.imagem || '' }
     };

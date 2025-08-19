@@ -1,11 +1,13 @@
 // backend/models/Cardapio.js
 import mongoose from 'mongoose';
 
-// descrição + imagem por cardápio
+// descrição + imagem em base64
 const itemSchema = new mongoose.Schema(
   {
     descricao: { type: String, default: '' },
-    imagem: { type: String, default: '' } // ex.: /uploads/cardapio1-xxx.jpg
+    imagem: { type: String, default: '' }, // base64 da imagem
+    imagemMimeType: { type: String, default: '' }, // image/jpeg, image/png, etc
+    imagemNome: { type: String, default: '' } // nome original do arquivo
   },
   { _id: false }
 );

@@ -17,8 +17,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = process.cwd();
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
-const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || '';
+const PORT = process.env.PORT ? Number(process.env.PORT) : 5000;
+const MONGODB_URI = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://localhost:27017/marmitex';
 const QR_DIR = path.resolve(ROOT, 'backend', 'qr');
 
 // Garante pasta do QR
@@ -45,82 +45,150 @@ app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 // Servir arquivos do QR
 app.use('/qr', express.static(QR_DIR));
 
-/* =========================
-   Rotas básicas
-========================= */
+// Adicionar esta linha para servir as imagens dos cardápios
+app.use('/uploads', express.static(path.resolve('uploads')));
+
 app.get('/', (_req, res) => {
-  res.json({ ok: true, name: 'Toin Marmitex API', time: new Date().toISOString() });
+  res.json({ message: 'API Marmitex funcionando!', timestamp: new Date().toISOString() });
 });
 
 app.get('/healthz', (_req, res) => {
-  res.json({ status: 'ok', uptime: process.uptime(), pid: process.pid });
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Página para visualizar o QR que é salvo em backend/qr/marmitex-bot.png
+// Rota para visualizar QR no navegador
 app.get('/qr/view', (_req, res) => {
-  res.setHeader('Content-Type', 'text/html; charset=utf-8');
-  res.end(`
-    <!doctype html>
+  const qrPath = path.join(QR_DIR, 'qr.png');
+  
+  // Verificar se o arquivo existe e não está vazio
+  if (fs.existsSync(qrPath)) {
+    const stats = fs.statSync(qrPath);
+    if (stats.size > 0) {
+      res.sendFile(qrPath);
+      return;
+    }
+  }
+  
+  // Se não existe ou está vazio, mostrar página de aguardo
+  res.status(404).send(`
+    <!DOCTYPE html>
     <html>
     <head>
-      <meta http-equiv="refresh" content="5">
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>QR WhatsApp - marmitex-bot</title>
+      <title>QR Code - Marmitex Bot</title>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
-        :root { color-scheme: dark; }
-        body{font-family:system-ui,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;background:#111;color:#eee;margin:0}
-        .card{padding:24px;background:#1d1d1d;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.3);text-align:center;max-width:92vw}
-        img{max-width:70vmin;width:420px;height:auto;border-radius:8px}
-        small{opacity:.7}
-        .muted{opacity:.6;font-size:12px}
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status { padding: 20px; border-radius: 8px; margin: 20px 0; }
+        .waiting { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .instructions { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; text-align: left; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       </style>
     </head>
     <body>
-      <div class="card">
-        <h2>Escaneie este QR no WhatsApp</h2>
-        <p><img src="/qr/marmitex-bot.png?ts=${Date.now()}" alt="QR Code"></p>
-        <small>Esta página atualiza a cada 5s automaticamente.</small>
-        <p class="muted">Se a imagem estiver em branco, aguarde gerar novamente ou recarregue após alguns segundos.</p>
+      <div class="container">
+        <h1>🤖 Marmitex WhatsApp Bot</h1>
+        <div class="spinner"></div>
+        <div class="status waiting">
+          <h3>⏳ Aguardando QR Code...</h3>
+          <p>O QR Code está sendo gerado. Aguarde alguns segundos.</p>
+          <p><strong>Esta página será atualizada automaticamente.</strong></p>
+        </div>
+        <div class="status instructions">
+          <h4>📱 Como conectar:</h4>
+          <ol>
+            <li>Abra o WhatsApp no seu celular</li>
+            <li>Vá em <strong>Configurações > Aparelhos conectados</strong></li>
+            <li>Toque em <strong>Conectar um aparelho</strong></li>
+            <li>Escaneie o QR Code que aparecerá aqui</li>
+          </ol>
+        </div>
       </div>
+      <script>
+        // Auto-refresh a cada 3 segundos
+        setTimeout(() => window.location.reload(), 3000);
+      </script>
     </body>
     </html>
   `);
 });
 
 /* =========================
-   Suas rotas (se existirem)
-   Ex.: import routers se você já tiver
+   Rotas da API
 ========================= */
-// Tente carregar rotas opcionais se você as tiver criadas (não quebra se não existir)
-async function tryMountOptionalRouters() {
-  const possibleRouters = [
-    './routes/auth.routes.js',
-    './routes/cardapio.routes.js',
-    './routes/pedidos.routes.js',
-    './routes/config.routes.js',
-  ];
+async function mountApiRoutes() {
+  try {
+    console.log('🔧 Montando rotas da API...');
+    
+    // Importar e montar rotas de autenticação
+    try {
+      const authRoutes = await import('./routes/auth.js');
+      app.use('/api/auth', authRoutes.default);
+      console.log('✅ Rotas de autenticação montadas em /api/auth');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de autenticação:', err.message);
+    }
 
-  for (const relPath of possibleRouters) {
-    const absPath = path.resolve(__dirname, relPath);
-    if (fs.existsSync(absPath)) {
+    // Importar e montar rotas de cardápios
+    try {
+      const cardapioRoutes = await import('./routes/cardapios.js');
+      app.use('/api/cardapios', cardapioRoutes.default);
+      console.log('✅ Rotas de cardápios montadas em /api/cardapios');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de cardápios:', err.message);
+    }
+
+    // Importar e montar rotas de pedidos
+    try {
+      const pedidoRoutes = await import('./routes/pedidos.js');
+      app.use('/api/pedidos', pedidoRoutes.default);
+      console.log('✅ Rotas de pedidos montadas em /api/pedidos');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de pedidos:', err.message);
+    }
+
+    // Importar e montar rotas de configurações
+    try {
+      const configRoutes = await import('./routes/configuracoes.js');
+      app.use('/api/configuracoes', configRoutes.default);
+      console.log('✅ Rotas de configurações montadas em /api/configuracoes');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de configurações:', err.message);
+    }
+
+    // Importar e montar outras rotas se existirem
+    const optionalRoutes = [
+      { file: './routes/index.js', path: '/api' },
+      { file: './routes/upload.js', path: '/api/upload' },
+      { file: './routes/webhooks.js', path: '/api/webhooks' }, // ✅ JÁ CONFIGURADO
+    ];
+
+    for (const { file, path: routePath } of optionalRoutes) {
       try {
-        const mod = await import(pathToFileURL(absPath).href);
-        if (mod?.default) {
-          // monta em base path deduzida pelo nome do arquivo
-          const base = '/' + path.basename(relPath).replace('.routes.js', '').replace('.js', '').replace('.routes', '');
-          app.use(base, mod.default);
-          console.log(`✅ Rotas montadas em ${base} a partir de ${relPath}`);
-        } else if (mod?.router) {
-          const base = '/' + path.basename(relPath).replace('.routes.js', '').replace('.js', '').replace('.routes', '');
-          app.use(base, mod.router);
-          console.log(`✅ Rotas montadas (named export "router") em ${base} a partir de ${relPath}`);
-        } else {
-          console.log(`ℹ️  ${relPath} encontrado, mas não exporta default nem {router}. Ignorando.`);
-        }
-      } catch (e) {
-        console.warn(`⚠️  Falha ao importar ${relPath}:`, e.message);
+        const routes = await import(file);
+        app.use(routePath, routes.default);
+        console.log(`✅ Rotas montadas em ${routePath} a partir de ${file}`);
+      } catch (err) {
+        console.log(`ℹ️  ${file} não encontrado - ignorando`);
       }
     }
+
+    // Rota catch-all para APIs não encontradas
+    app.use('/api/*', (req, res) => {
+      res.status(404).json({ 
+        erro: 'Rota não encontrada', 
+        path: req.path,
+        method: req.method,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    console.log('🎯 Todas as rotas da API foram processadas');
+
+  } catch (err) {
+    console.error('❌ Erro crítico ao montar rotas da API:', err);
   }
 }
 
@@ -128,17 +196,15 @@ async function tryMountOptionalRouters() {
    MongoDB
 ========================= */
 async function connectMongo() {
-  if (!MONGODB_URI) {
-    console.warn('⚠️  MONGODB_URI não definido no .env — seguindo sem DB.');
-    return;
-  }
   try {
-    await mongoose.connect(MONGODB_URI, {
-      // opções modernas do driver já são padrão no Mongoose 7+
-    });
-    console.log('✅ MongoDB conectado.');
+    if (!MONGODB_URI) {
+      console.warn('⚠️  MONGODB_URI não definida. Usando padrão local.');
+    }
+    await mongoose.connect(MONGODB_URI);
+    console.log('✅ MongoDB conectado:', mongoose.connection.db.databaseName);
   } catch (err) {
-    console.error('❌ Erro ao conectar no MongoDB:', err);
+    console.error('❌ Erro ao conectar MongoDB:', err.message);
+    throw err;
   }
 }
 
@@ -147,11 +213,12 @@ async function connectMongo() {
 ========================= */
 async function initWhatsApp() {
   try {
-    // Inicia/recupera o cliente
+    console.log('🤖 Inicializando WhatsApp...');
+    
     const clientPromise = await startClient('marmitex-bot', {
       headless: true,
       autoClose: 0,
-      logQR: true,   // deixa o ASCII no terminal quando possível
+      logQR: true,
       debug: false,
     });
 
@@ -160,45 +227,42 @@ async function initWhatsApp() {
 
     const ready = await waitUntilReady(client);
     if (!ready) {
-      console.log('ℹ️  Ainda não logado. Abra http://localhost:' + PORT + '/qr/view para escanear o QR.');
+      console.log(`ℹ️  Ainda não logado. Abra http://localhost:${PORT}/qr/view para escanear o QR.`);
     } else {
       console.log('🎉 WhatsApp logado e pronto!');
     }
 
-    // Tenta registrar o fluxo do bot
     await mountWhatsAppBot(client);
   } catch (err) {
-    console.error('❌ Erro ao iniciar WhatsApp:', err);
+    console.error('❌ Erro ao iniciar WhatsApp:', err.message);
   }
 }
 
 async function mountWhatsAppBot(client) {
-  // Tenta várias formas para funcionar com o seu whatsappBot.js atual
   const botPath = path.resolve(__dirname, './services/whatsappBot.js');
   if (!fs.existsSync(botPath)) {
     console.warn('⚠️  services/whatsappBot.js não encontrado — seguindo sem fluxo do bot.');
     return;
   }
+  
   try {
     const mod = await import(pathToFileURL(botPath).href);
 
-    // 1) default export é uma função initBot(client)
     if (typeof mod?.default === 'function') {
       await mod.default(client);
       console.log('🤖 whatsappBot (default) inicializado.');
       return;
     }
-    // 2) named export initBot
+    
     if (typeof mod?.initBot === 'function') {
       await mod.initBot(client);
       console.log('🤖 whatsappBot (initBot) inicializado.');
       return;
     }
-    // 3) Sem exports de função: apenas importar já registra listeners internamente
-    //    (e.g., o arquivo importa getClient e faz client.onMessage(...))
+    
     console.log('ℹ️  whatsappBot.js não exporta init; assumindo registro por side-effect.');
   } catch (e) {
-    console.error('❌ Falha ao carregar services/whatsappBot.js:', e);
+    console.error('❌ Falha ao carregar services/whatsappBot.js:', e.message);
   }
 }
 
@@ -206,40 +270,56 @@ async function mountWhatsAppBot(client) {
    Start
 ========================= */
 async function start() {
-  await connectMongo();
-  await tryMountOptionalRouters();
+  try {
+    console.log('🚀 Iniciando servidor Marmitex...');
+    
+    // Conecta ao MongoDB
+    await connectMongo();
+    
+    // Monta as rotas da API
+    await mountApiRoutes();
 
-  // Sobe servidor HTTP
-  const server = app.listen(PORT, () => {
-    console.log(`🚀 API rodando em http://localhost:${PORT}`);
-  });
+    // Sobe servidor HTTP
+    const server = app.listen(PORT, () => {
+      console.log(`🌐 API rodando em http://localhost:${PORT}`);
+      console.log(`📱 QR Code: http://localhost:${PORT}/qr/view`);
+      console.log(`🔍 Health Check: http://localhost:${PORT}/healthz`);
+    });
 
-  // Inicia WhatsApp client
-  await initWhatsApp();
+    // Inicia WhatsApp client
+    await initWhatsApp();
 
-  // Encerramento gracioso
-  const shutdown = async (signal) => {
-    try {
-      console.log(`\n${signal} recebido. Encerrando...`);
-      // Fecha HTTP
-      await new Promise((resolve) => server.close(resolve));
-      // Fecha Mongo
-      if (mongoose.connection.readyState === 1) {
-        await mongoose.connection.close();
-        console.log('🛑 MongoDB desconectado.');
+    // Encerramento gracioso
+    const shutdown = async (signal) => {
+      try {
+        console.log(`\n${signal} recebido. Encerrando...`);
+        
+        // Fecha HTTP
+        await new Promise((resolve) => server.close(resolve));
+        console.log('🛑 Servidor HTTP fechado.');
+        
+        // Fecha Mongo
+        if (mongoose.connection.readyState === 1) {
+          await mongoose.connection.close();
+          console.log('🛑 MongoDB desconectado.');
+        }
+      } catch (e) {
+        console.error('Erro no shutdown:', e);
+      } finally {
+        process.exit(0);
       }
-    } catch (e) {
-      console.error('Erro no shutdown:', e);
-    } finally {
-      process.exit(0);
-    }
-  };
+    };
 
-  process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    
+  } catch (err) {
+    console.error('❌ Erro fatal no bootstrap:', err);
+    process.exit(1);
+  }
 }
 
 start().catch((err) => {
-  console.error('Erro fatal no bootstrap:', err);
+  console.error('💥 Erro crítico na inicialização:', err);
   process.exit(1);
 });
