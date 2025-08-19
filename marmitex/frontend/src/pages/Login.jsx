@@ -1,6 +1,6 @@
 // frontend/src/pages/Login.jsx
 import { useState } from 'react';
-import { apiLogin } from '../services/api';
+import { apiLogin, setToken } from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -13,7 +13,9 @@ export default function Login() {
     setErro('');
     setLoading(true);
     try {
-      await apiLogin({ email, senha }); // já salva o token no localStorage
+      const response = await apiLogin({ email, senha });
+      // Salvar o token no localStorage
+      setToken(response.token);
       window.location.replace('/');     // vai para o painel
     } catch (err) {
       console.error(err);

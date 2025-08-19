@@ -3,14 +3,35 @@
 
 import { waitUntilReady } from '../config/wppconnect.js';
 import Pedido from '../models/Pedido.js';
+import fetch from 'node-fetch';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import { criarPagamentoPIX } from './mercadoPagoService.js';
 
-/* ======================= GATES ANTI-STATUS/BROADCAST/GRUPO ======================= */
-function isStatusJid(jid) { return typeof jid === 'string' && jid === 'status@broadcast'; }
-function isBroadcastJid(jid) { return typeof jid === 'string' && jid.endsWith('@broadcast'); }
-function isGroupJid(jid) { return typeof jid === 'string' && jid.endsWith('@g.us'); }
-function isPrivateChatJid(jid) { return typeof jid === 'string' && jid.endsWith('@c.us'); }
-function isForbiddenJid(jid) { return isStatusJid(jid) || isBroadcastJid(jid) || isGroupJid(jid) || !isPrivateChatJid(jid); }
-/* ================================================================================ */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/* ======================= VARIÁVEIS GLOBAIS ======================= */
+// Mapa de sessões ativas
+const SESSOES = new Map();
+
+// Variáveis do simulador
+const SIM_CONVERSA = [];
+const SIM_TEL = '5511999999999@c.us';
+
+// Monitor de conexão
+let connectionMonitor = null;
+
+/* ======================= CONFIGURAÇÕES DE ESTABILIDADE ======================= */
+const BOT_CONFIG = {
+  MAX_RETRY_ATTEMPTS: 3,
+  RETRY_DELAY_MS: 2000,
+  MESSAGE_TIMEOUT_MS: 30000,
+  SESSION_CLEANUP_INTERVAL_MS: 3600000, // 1 hora
+  MAX_SESSIONS: 1000,
+  HEARTBEAT_INTERVAL_MS: 300000, // 5 minutos
+};
 
 /* =================== Configurações de Fluxo/Preços =================== */
 const PRECOS = {
@@ -26,30 +47,92 @@ const PRECOS = {
 };
 
 const PIX_KEY = process.env.PIX_KEY || 'SUACHAVE-PIX-AQUI';
+const NUMERO_TESTE = '557391472169@c.us';
 
-const CARDAPIOS = {
-  'CARDÁPIO 1': [
-    '• Arroz, Feijão, Bife acebolado, Batata frita, Salada',
-    '• Macarronada ao sugo com frango grelhado',
-  ],
-  'CARDÁPIO 2': [
-    '• Arroz, Feijão, Frango à milanesa, Purê, Salada',
-    '• Escondidinho de carne com arroz e salada',
-  ],
-};
+// Adicionar configurações de modo privado
+const MODO_PRIVADO = process.env.MODO_PRIVADO === 'true';
+const WHATSAPP_ALLOWED = process.env.WHATSAPP_ALLOWED || '557391472169,9848494243912';
+const NUMEROS_PERMITIDOS = WHATSAPP_ALLOWED.split(',').map(num => num.trim());
 
-/* =================== Estado =================== */
-const SESSOES = new Map(); // telefone -> sessão
-const SIM_TEL = 'simulador';
-const SIM_CONVERSA = []; // { who: 'user'|'bot', text, ts }
+/* =================== Funções de Monitoramento =================== */
+function startConnectionMonitor(client) {
+  console.log('🔄 Iniciando monitor de conexão...');
+  
+  // Limpar monitor anterior se existir
+  if (connectionMonitor) {
+    clearInterval(connectionMonitor);
+  }
+  
+  connectionMonitor = setInterval(async () => {
+    try {
+      const isConnected = await client.getConnectionState();
+      console.log(`📡 Status da conexão: ${isConnected}`);
+      
+      // Limpar sessões antigas
+      cleanupOldSessions();
+      
+    } catch (error) {
+      console.error('❌ Erro no monitor de conexão:', error.message);
+    }
+  }, BOT_CONFIG.HEARTBEAT_INTERVAL_MS);
+}
 
+function stopConnectionMonitor() {
+  console.log('🛑 Parando monitor de conexão...');
+  if (connectionMonitor) {
+    clearInterval(connectionMonitor);
+    connectionMonitor = null;
+  }
+}
+
+function cleanupOldSessions() {
+  const now = Date.now();
+  const expiredSessions = [];
+  
+  for (const [telefone, sessao] of SESSOES.entries()) {
+    if (now - sessao.lastActivity > BOT_CONFIG.SESSION_CLEANUP_INTERVAL_MS) {
+      expiredSessions.push(telefone);
+    }
+  }
+  
+  expiredSessions.forEach(telefone => {
+    SESSOES.delete(telefone);
+    console.log(`🧹 Sessão expirada removida: ${telefone}`);
+  });
+  
+  if (expiredSessions.length > 0) {
+    console.log(`🧹 ${expiredSessions.length} sessões antigas removidas`);
+  }
+}
+
+/* =================== Funções de Autorização =================== */
+function isAuthorizedNumber(from) {
+  if (!MODO_PRIVADO) return true;
+  
+  const cleanNumber = from.replace('@c.us', '');
+  return NUMEROS_PERMITIDOS.some(num => cleanNumber.includes(num));
+}
+
+function isForbiddenJid(jid) {
+  const forbiddenPatterns = [
+    '@g.us',     // grupos
+    '@broadcast', // listas de transmissão
+    'status@broadcast' // status
+  ];
+  
+  return forbiddenPatterns.some(pattern => jid.includes(pattern));
+}
+
+/* =================== Funções Auxiliares =================== */
 function resetSessao(telefone) {
   SESSOES.set(telefone, {
     etapa: 'inicio',
+    lastActivity: Date.now(),
     dados: {
       cardapio: null,
       tamanho: null,
-      bebida: 'Não',
+      bebida: null,
+      formaPagamento: null,
       total: 0,
       trocoPara: null,
     },
@@ -57,372 +140,443 @@ function resetSessao(telefone) {
   });
 }
 
-function precoTamanho(tamanho) { return PRECOS[tamanho] || 0; }
-function precoBebida(nome) { return PRECOS.bebidas[nome] ?? 0; }
-function normalizarTexto(t) { return (t || '').trim().toLowerCase(); }
-
-function resumoPedido(d) {
-  const linhas = [
-    '🍽️ *Resumo do pedido*',
-    '────────────────────',
-    `• Cardápio: *${d.cardapio?.tipo || '-'}*`,
-    `• Tamanho: *${d.tamanho || '-'}*`,
-    `• Bebida: *${d.bebida || 'Não'}*`,
-  ];
-  if (d.trocoPara) linhas.push(`• Troco para: *R$ ${Number(d.trocoPara).toFixed(2)}*`);
-  linhas.push(`• Total: *R$ ${Number(d.total).toFixed(2)}*`);
-  return linhas.join('\n');
-}
-
-function isNavError(err) {
-  const msg = String(err?.message || err);
-  return (
-    msg.includes('Execution context was destroyed') ||
-    msg.includes('Cannot find context') ||
-    msg.includes('Target closed') ||
-    msg.includes('Navigation')
-  );
-}
-
-/* =================== Envio com GATE + Retry =================== */
-async function enviarMensagem(client, telefone, texto) {
-  const ok = await waitUntilReady(client, 180000); // até 3 min pra conectar/parear
-  if (!ok) throw new Error('Cliente não conectou (aguarde ler o QR).');
-
-  let attempt = 0;
-  const max = 5;
-
-  while (true) {
-    try {
-      return await client.sendText(telefone, texto);
-    } catch (err) {
-      attempt++;
-      if (attempt >= max || !isNavError(err)) throw err;
-      const wait = 300 * attempt;
-      console.warn(`sendText falhou por navegação (tentativa ${attempt}/${max}). Aguardar ${wait}ms...`);
-      await new Promise((r) => setTimeout(r, wait));
-      await waitUntilReady(client, 60000);
-    }
+function updateSessionActivity(telefone) {
+  const sessao = SESSOES.get(telefone);
+  if (sessao) {
+    sessao.lastActivity = Date.now();
   }
 }
 
-// Enviador genérico (p/ Whats real e simulador)
-async function enviar(clientOrFn, telefone, texto) {
-  if (typeof clientOrFn === 'function') return clientOrFn(telefone, texto); // simulador
-  return enviarMensagem(clientOrFn, telefone, texto);
+// Função para normalizar texto
+function normalizarTexto(texto) {
+  return texto
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+    .replace(/[^a-z0-9\s]/g, '') // Remove caracteres especiais
+    .replace(/\s+/g, ' '); // Normaliza espaços
 }
 
-/* =================== Núcleo do fluxo =================== */
-async function processarMensagem(clientOrFn, telefone, texto) {
+// Função para enviar mensagens
+async function enviar(clientOrFn, telefone, mensagem) {
   try {
-    if (!SESSOES.has(telefone)) resetSessao(telefone);
+    if (typeof clientOrFn === 'function') {
+      // Modo simulador
+      clientOrFn(telefone, mensagem);
+    } else {
+      // Modo real
+      await clientOrFn.sendText(telefone, mensagem);
+    }
+    console.log(`✅ Mensagem enviada para ${telefone}: ${mensagem.substring(0, 50)}...`);
+  } catch (error) {
+    console.error(`❌ Erro ao enviar mensagem para ${telefone}:`, error.message);
+    throw error;
+  }
+}
+
+async function buscarCardapioDodia() {
+  try {
+    // Buscar cardápio do banco de dados usando o controller
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
+    const Cardapio = (await import('../models/Cardapio.js')).default;
+    const cardapio = await Cardapio.findOne({
+      data: {
+        $gte: hoje,
+        $lt: amanha
+      }
+    });
+    
+    if (!cardapio) {
+      return {
+        cardapio1: { descricao: 'Feijoada Completa', imagem: '' },
+        cardapio2: { descricao: 'Frango Grelhado com Legumes', imagem: '' }
+      };
+    }
+    
+    return cardapio;
+  } catch (error) {
+    console.error('❌ Erro ao buscar cardápio:', error.message);
+    return {
+      cardapio1: { descricao: 'Feijoada Completa', imagem: '' },
+      cardapio2: { descricao: 'Frango Grelhado com Legumes', imagem: '' }
+    };
+  }
+}
+
+// Função de processamento - CORRIGIDA
+async function processarMensagem(clientOrFn, telefone, texto) {
+  const startTime = Date.now();
+
+  try {
+    if (!SESSOES.has(telefone)) {
+      resetSessao(telefone);
+      console.log(`🆕 Nova sessão criada para ${telefone}`);
+    }
+
     const sessao = SESSOES.get(telefone);
+    updateSessionActivity(telefone);
 
     const tNorm = normalizarTexto(texto);
+    console.log(`📨 Processando mensagem de ${telefone}: "${texto}" (etapa: ${sessao.etapa})`);
 
-    // Atalhos de início
-    if (['oi', 'menu', 'toin', 'cardapio', 'cardápio', 'start'].includes(tNorm) || sessao.etapa === 'inicio') {
-      sessao.etapa = 'escolher_cardapio';
-      const menu1 = CARDAPIOS['CARDÁPIO 1'].map((i) => `   ${i}`).join('\n');
-      const menu2 = CARDAPIOS['CARDÁPIO 2'].map((i) => `   ${i}`).join('\n');
-      await enviar(clientOrFn, telefone, [
-        '🥘 *CARDÁPIO DO DIA*',
-        '────────────────────',
-        '*1)* CARDÁPIO 1:',
-        menu1,
-        '',
-        '*2)* CARDÁPIO 2:',
-        menu2,
-        '',
-        'Responda com *1* ou *2* para escolher.',
-      ].join('\n'));
+    // Atalhos globais
+    if (tNorm === 'reiniciar' || tNorm === 'inicio') {
+      resetSessao(telefone);
+      await enviar(clientOrFn, telefone, '🔄 Sessão reiniciada! Digite qualquer coisa para ver o cardápio.');
       return;
     }
 
-    // Aguardando PIX
-    if (sessao.aguardandoPIX) {
-      if (tNorm.includes('pago')) {
-        await enviar(clientOrFn, telefone, '✅ Pagamento confirmado! Sua marmita já está sendo preparada. Obrigado! 🍽️');
-        sessao.aguardandoPIX = false;
-        sessao.etapa = 'finalizado';
-        return;
-      } else {
-        await enviar(clientOrFn, telefone, 'Ainda aguardando confirmação do pagamento. Envie *pago* assim que concluir o PIX, por favor.');
-        return;
-      }
-    }
-
     switch (sessao.etapa) {
-      case 'escolher_cardapio': {
-        if (tNorm === '1' || tNorm.includes('cardapio 1') || tNorm.includes('cardápio 1')) {
-          sessao.dados.cardapio = { tipo: 'CARDÁPIO 1', itens: CARDAPIOS['CARDÁPIO 1'] };
-        } else if (tNorm === '2' || tNorm.includes('cardapio 2') || tNorm.includes('cardápio 2')) {
-          sessao.dados.cardapio = { tipo: 'CARDÁPIO 2', itens: CARDAPIOS['CARDÁPIO 2'] };
+      case 'inicio':
+        // Mensagem de boas-vindas primeiro
+        await enviar(clientOrFn, telefone, '👋 Olá! Bem-vindo(a) à nossa marmitaria! 🍽️\n\nVamos ver o cardápio de hoje:');
+        
+        // Aguardar 2 segundos antes de mostrar o cardápio
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // QUALQUER mensagem inicial mostra o cardápio (como estava antes)
+        const cardapio = await buscarCardapioDodia();
+        
+        // Enviar cardápio 1 com imagem e descrição
+        if (cardapio.cardapio1?.imagem) {
+          try {
+            await clientOrFn.sendImageFromBase64(
+              telefone,
+              cardapio.cardapio1.imagem,
+              'cardapio1.jpg',
+              `📋 *Cardápio 1*\n${cardapio.cardapio1.descricao}`
+            );
+          } catch (imgError) {
+            console.warn('⚠️ Erro ao enviar imagem do cardápio 1:', imgError.message);
+            // Se falhar, enviar só o texto
+            await enviar(clientOrFn, telefone, `📋 *Cardápio 1*: ${cardapio.cardapio1.descricao}`);
+          }
         } else {
-          await enviar(clientOrFn, telefone, 'Opção inválida. Responda com *1* (CARDÁPIO 1) ou *2* (CARDÁPIO 2).');
-          return;
+          // Se não tiver imagem, enviar só o texto
+          await enviar(clientOrFn, telefone, `📋 *Cardápio 1*: ${cardapio.cardapio1.descricao}`);
         }
-        sessao.etapa = 'escolher_tamanho';
-        await enviar(clientOrFn, telefone, [
-          '📏 *Tamanho da marmita*',
-          '────────────────────',
-          `1) P - R$ ${PRECOS.P.toFixed(2)}`,
-          `2) M - R$ ${PRECOS.M.toFixed(2)}`,
-          `3) G - R$ ${PRECOS.G.toFixed(2)}`,
-          '',
-          'Responda com *1*, *2* ou *3*.',
-        ].join('\n'));
-        return;
-      }
-
-      case 'escolher_tamanho': {
-        let tamanho = null;
-        if (tNorm === '1' || tNorm === 'p') tamanho = 'P';
-        if (tNorm === '2' || tNorm === 'm') tamanho = 'M';
-        if (tNorm === '3' || tNorm === 'g') tamanho = 'G';
-        if (!tamanho) { await enviar(clientOrFn, telefone, 'Ops! Responda com *1* (P), *2* (M) ou *3* (G).'); return; }
-        sessao.dados.tamanho = tamanho;
-        sessao.dados.total = precoTamanho(tamanho);
-        sessao.etapa = 'escolher_bebida';
-        await enviar(clientOrFn, telefone, [
-          '🥤 *Bebida*',
-          '────────────────────',
-          `1) Coca Lata - R$ ${PRECOS.bebidas['Coca Lata'].toFixed(2)}`,
-          `2) Coca 1L   - R$ ${PRECOS.bebidas['Coca 1L'].toFixed(2)}`,
-          `3) Coca 2L   - R$ ${PRECOS.bebidas['Coca 2L'].toFixed(2)}`,
-          '4) Não',
-          '',
-          'Responda com *1*, *2*, *3* ou *4*.',
-        ].join('\n'));
-        return;
-      }
-
-      case 'escolher_bebida': {
-        let bebida = null;
-        if (tNorm === '1') bebida = 'Coca Lata';
-        if (tNorm === '2') bebida = 'Coca 1L';
-        if (tNorm === '3') bebida = 'Coca 2L';
-        if (tNorm === '4' || tNorm === 'nao' || tNorm === 'não') bebida = 'Não';
-        if (!bebida) { await enviar(clientOrFn, telefone, 'Escolha inválida. Responda com *1*, *2*, *3* ou *4*.'); return; }
-        sessao.dados.bebida = bebida;
-        sessao.dados.total = precoTamanho(sessao.dados.tamanho) + precoBebida(bebida);
-        sessao.etapa = 'confirmar_pedido';
-        await enviar(clientOrFn, telefone, [
-          resumoPedido(sessao.dados),
-          '',
-          'Confirma o pedido?',
-          'Responda *sim* para confirmar ou *não* para cancelar.',
-        ].join('\n'));
-        return;
-      }
-
-      case 'confirmar_pedido': {
-        if (['sim', 's', 'confirmo'].includes(tNorm)) {
-          sessao.etapa = 'forma_pagamento';
-          await enviar(clientOrFn, telefone, [
-            '💳 *Forma de pagamento*',
-            '────────────────────',
-            '1) Dinheiro',
-            '2) PIX',
-            '3) Cartão',
-            '',
-            'Responda com *1*, *2* ou *3*.',
-          ].join('\n'));
-          return;
-        } else if (['nao', 'não', 'n'].includes(tNorm)) {
-          await enviar(clientOrFn, telefone, 'Pedido cancelado. Se quiser começar de novo, envie *menu*.');
-          resetSessao(telefone);
-          return;
+        
+        // Aguardar 1.5 segundos antes de mostrar o cardápio 2
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        // Enviar cardápio 2 com imagem e descrição
+        if (cardapio.cardapio2?.imagem) {
+          try {
+            await clientOrFn.sendImageFromBase64(
+              telefone,
+              cardapio.cardapio2.imagem,
+              'cardapio2.jpg',
+              `📋 *Cardápio 2*\n${cardapio.cardapio2.descricao}`
+            );
+          } catch (imgError) {
+            console.warn('⚠️ Erro ao enviar imagem do cardápio 2:', imgError.message);
+            // Se falhar, enviar só o texto
+            await enviar(clientOrFn, telefone, `📋 *Cardápio 2*: ${cardapio.cardapio2.descricao}`);
+          }
         } else {
-          await enviar(clientOrFn, telefone, 'Por favor, responda *sim* para confirmar ou *não* para cancelar.');
-          return;
+          // Se não tiver imagem, enviar só o texto
+          await enviar(clientOrFn, telefone, `📋 *Cardápio 2*: ${cardapio.cardapio2.descricao}`);
         }
-      }
+        
+        // Aguardar 1 segundo antes da mensagem de escolha
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Enviar mensagem de escolha SEM o título \"Cardápio de Hoje\"
+        const textoEscolha = `Digite o número do cardápio desejado:\n1️⃣ Cardápio 1\n2️⃣ Cardápio 2`;
+        
+        sessao.etapa = 'cardapio';
+        await enviar(clientOrFn, telefone, textoEscolha);
+        break;
 
-      case 'forma_pagamento': {
-        let forma = null;
-        if (tNorm === '1' || tNorm.includes('dinheiro')) forma = 'Dinheiro';
-        if (tNorm === '2' || tNorm === 'pix') forma = 'PIX';
-        if (tNorm === '3' || tNorm.includes('cartao') || tNorm.includes('cartão')) forma = 'Cartão';
-        if (!forma) { await enviar(clientOrFn, telefone, 'Opção inválida. Responda com *1* (Dinheiro), *2* (PIX) ou *3* (Cartão).'); return; }
+      case 'cardapio':
+        if (['1', '2'].includes(tNorm)) {
+          const cardapio = await buscarCardapioDodia();
+          
+          sessao.dados.cardapio = {
+            opcao: tNorm,
+            tipo: tNorm === '1' ? cardapio.cardapio1.descricao : cardapio.cardapio2.descricao
+          };
 
-        // Se for DINHEIRO, perguntar troco antes de gravar pedido
-        if (forma === 'Dinheiro') {
-          sessao.dados.formaPagamento = forma;
-          sessao.etapa = 'troco_dinheiro';
-          await enviar(clientOrFn, telefone, [
-            '🧾 Você precisa de *troco*?',
-            'Se sim, responda com o valor: ex: *50* ou *R$ 100*.',
-            'Se não precisa, responda *não*.',
-          ].join('\n'));
-          return;
-        }
+          sessao.etapa = 'tamanho';
 
-        // PIX ou Cartão -> já cria pedido
-        const pedidoCriado = await Pedido.create({
-          telefone,
-          cardapio: { tipo: sessao.dados.cardapio.tipo, itens: sessao.dados.cardapio.itens || [] },
-          tamanho: sessao.dados.tamanho,
-          bebida: sessao.dados.bebida,
-          formaPagamento: forma,
-          total: sessao.dados.total,
-          statusPagamento: forma === 'PIX' ? 'pendente' : 'nao_aplicavel',
-          status: 'em_preparo',
-        });
+          const textoTamanho = `✅ *${sessao.dados.cardapio.tipo}* selecionado!
 
-        if (forma === 'PIX') {
-          SESSOES.get(telefone).aguardandoPIX = true;
-          await enviar(clientOrFn, telefone, [
-            '🔑 *PIX* selecionado.',
-            `Chave PIX: *${PIX_KEY}*`,
-            `Valor: *R$ ${SESSOES.get(telefone).dados.total.toFixed(2)}*`,
-            '',
-            'Após pagar, responda aqui com *pago* para confirmarmos.',
-          ].join('\n'));
+Escolha o tamanho da marmita:
+
+1️⃣ Pequena (P) - R$ ${PRECOS.P.toFixed(2).replace('.', ',')}
+2️⃣ Média (M) - R$ ${PRECOS.M.toFixed(2).replace('.', ',')}
+3️⃣ Grande (G) - R$ ${PRECOS.G.toFixed(2).replace('.', ',')}`;
+
+          await enviar(clientOrFn, telefone, textoTamanho);
         } else {
-          await enviar(clientOrFn, telefone, [
-            '✅ Pedido confirmado! Sua marmita já está sendo preparada. 😋',
-            '',
-            `Número do pedido: *${pedidoCriado._id}*`,
-            'Agradecemos a preferência!',
-          ].join('\n'));
-          SESSOES.get(telefone).etapa = 'finalizado';
+          await enviar(clientOrFn, telefone, 
+            '❌ Opção inválida. Digite *1* ou *2* para escolher o cardápio.'
+          );
         }
-        return;
-      }
+        break;
 
-      case 'troco_dinheiro': {
-        if (['nao', 'não', 'n'].includes(tNorm)) {
-          sessao.dados.trocoPara = null;
+      case 'tamanho':
+        if (['1', '2', '3'].includes(tNorm)) {
+          const tamanhos = { '1': 'P', '2': 'M', '3': 'G' };
+          const tamanho = tamanhos[tNorm];
+          
+          sessao.dados.tamanho = tamanho;
+          sessao.dados.preco = PRECOS[tamanho];
+          sessao.etapa = 'bebida';
+
+          const textoBebida = `✅ Tamanho *${tamanho}* selecionado!
+
+🥤 Deseja adicionar bebida?
+
+1️⃣ Coca Lata - R$ ${PRECOS.bebidas['Coca Lata'].toFixed(2).replace('.', ',')}
+2️⃣ Coca 1L - R$ ${PRECOS.bebidas['Coca 1L'].toFixed(2).replace('.', ',')}
+3️⃣ Coca 2L - R$ ${PRECOS.bebidas['Coca 2L'].toFixed(2).replace('.', ',')}
+4️⃣ Não, obrigado`;
+
+          await enviar(clientOrFn, telefone, textoBebida);
         } else {
-          // pega dígitos do texto
-          const m = (texto.match(/\d+[.,]?\d*/g) || [])[0];
-          if (m) {
-            const valor = Number(String(m).replace('.', '').replace(',', '.'));
-            if (!isNaN(valor) && valor > 0) sessao.dados.trocoPara = valor;
+          await enviar(clientOrFn, telefone, 
+            '❌ Opção inválida. Digite *1* (P), *2* (M) ou *3* (G).'
+          );
+        }
+        break;
+
+      case 'bebida':
+        if (['1', '2', '3', '4'].includes(tNorm)) {
+          const bebidas = {
+            '1': 'Coca Lata',
+            '2': 'Coca 1L', 
+            '3': 'Coca 2L',
+            '4': 'Não'
+          };
+
+          const bebida = bebidas[tNorm];
+          sessao.dados.bebida = bebida;
+          sessao.dados.precoBebida = PRECOS.bebidas[bebida];
+          sessao.dados.precoTotal = sessao.dados.preco + sessao.dados.precoBebida;
+          sessao.etapa = 'pagamento'; // Mudança: vai direto para pagamento
+
+          let textoBebida = '';
+          if (bebida === 'Não') {
+            textoBebida = '✅ Pedido sem bebida!';
+          } else {
+            textoBebida = `✅ *${bebida}* adicionada!`;
+          }
+
+          const textoPagamento = `${textoBebida}
+
+💰 *Total do pedido: R$ ${sessao.dados.precoTotal.toFixed(2).replace('.', ',')}*
+
+💳 Escolha a forma de pagamento:
+
+1️⃣ Dinheiro
+2️⃣ PIX
+3️⃣ Cartão`;
+
+          await enviar(clientOrFn, telefone, textoPagamento);
+        } else {
+          await enviar(clientOrFn, telefone, 
+            '❌ Opção inválida. Digite *1*, *2*, *3* ou *4*.'
+          );
+        }
+        break;
+
+      case 'pagamento':
+        if (['1', '2', '3'].includes(tNorm)) {
+          const formasPagamento = {
+            '1': 'Dinheiro',
+            '2': 'PIX', 
+            '3': 'Cartão'
+          };
+
+          const formaPagamento = formasPagamento[tNorm];
+          sessao.dados.formaPagamento = formaPagamento;
+          // Remover endereço - definir como padrão
+          sessao.dados.endereco = 'Retirada no local';
+
+          if (formaPagamento === 'Dinheiro') {
+            sessao.etapa = 'troco';
+            await enviar(clientOrFn, telefone, 
+              `Precisa de troco?\n\n` +
+              `1️⃣ Sim\n` +
+              `2️⃣ Não (valor exato)`
+            );
+          } else if (formaPagamento === 'PIX') {
+            await finalizarPedido(clientOrFn, telefone, sessao);
+
+            const pedidoSalvo = await Pedido.findOne({ 
+              telefone, 
+              statusPagamento: 'nao_aplicavel' 
+            }).sort({ createdAt: -1 });
+
+            if (pedidoSalvo) {
+              await enviarPIXComBotao(clientOrFn, telefone, pedidoSalvo);
+            }
+
+            resetSessao(telefone);
+          } else {
+            // Finalizar pedido para cartão também
+            await finalizarPedido(clientOrFn, telefone, sessao);
+            await enviar(clientOrFn, telefone, 
+              '✅ Pedido confirmado!\nForma de pagamento: Cartão\nSua marmita já está sendo preparada! 🍛'
+            );
+            resetSessao(telefone);
           }
         }
+        break;
 
-        const pedidoCriado = await Pedido.create({
-          telefone,
-          cardapio: { tipo: sessao.dados.cardapio.tipo, itens: sessao.dados.cardapio.itens || [] },
-          tamanho: sessao.dados.tamanho,
-          bebida: sessao.dados.bebida,
-          formaPagamento: 'Dinheiro',
-          trocoPara: sessao.dados.trocoPara,
-          total: sessao.dados.total,
-          statusPagamento: 'nao_aplicavel',
-          status: 'em_preparo',
-        });
-
-        await enviar(clientOrFn, telefone, [
-          resumoPedido(sessao.dados),
-          '',
-          '✅ Pedido confirmado! Sua marmita já está sendo preparada. 😋',
-          `Número do pedido: *${pedidoCriado._id}*`,
-        ].join('\n'));
-
-        SESSOES.get(telefone).etapa = 'finalizado';
-        return;
-      }
-
-      case 'finalizado': {
-        if (['menu', 'novopedido', 'novo pedido', 'toin', 'oi'].includes(tNorm)) {
-          resetSessao(telefone);
-          await enviar(clientOrFn, telefone, 'Vamos lá de novo! 👇');
-          SESSOES.get(telefone).etapa = 'escolher_cardapio';
-          const menu1 = CARDAPIOS['CARDÁPIO 1'].map((i) => `   ${i}`).join('\n');
-          const menu2 = CARDAPIOS['CARDÁPIO 2'].map((i) => `   ${i}`).join('\n');
-          await enviar(clientOrFn, telefone, [
-            '🥘 *CARDÁPIO DO DIA*',
-            '────────────────────',
-            '*1)* CARDÁPIO 1:',
-            menu1,
-            '',
-            '*2)* CARDÁPIO 2:',
-            menu2,
-            '',
-            'Responda com *1* ou *2* para escolher.',
-          ].join('\n'));
-          return;
+      case 'troco':
+        if (['1', '2'].includes(tNorm)) {
+          if (tNorm === '1') {
+            sessao.etapa = 'valor_troco';
+            await enviar(clientOrFn, telefone, 
+              'Para quanto você precisa de troco? (Digite apenas o valor)'
+            );
+          } else {
+            sessao.dados.troco = 'Não precisa';
+            await finalizarPedido(clientOrFn, telefone, sessao);
+            await enviar(clientOrFn, telefone, 
+              '✅ Pedido confirmado!\nSua marmita já está sendo preparada! 🍛'
+            );
+            resetSessao(telefone);
+          }
         } else {
-          await enviar(clientOrFn, telefone, 'Pedido já finalizado. Envie *menu* para fazer outro pedido.');
+          await enviar(clientOrFn, telefone, 
+            '❌ Opção inválida. Digite *1* (Sim) ou *2* (Não).'
+          );
+        }
+        break;
+
+      case 'valor_troco':
+        const valorTroco = parseFloat(texto.replace(',', '.'));
+        if (isNaN(valorTroco) || valorTroco <= sessao.dados.precoTotal) {
+          await enviar(clientOrFn, telefone, 
+            `❌ Valor inválido. Digite um valor maior que R$ ${sessao.dados.precoTotal.toFixed(2).replace('.', ',')}`
+          );
+        } else {
+          sessao.dados.troco = `R$ ${valorTroco.toFixed(2).replace('.', ',')}`;
+          await finalizarPedido(clientOrFn, telefone, sessao);
+          await enviar(clientOrFn, telefone, 
+            `✅ Pedido confirmado!\nTroco para: ${sessao.dados.troco}\nSua marmita já está sendo preparada! 🍛`
+          );
+          resetSessao(telefone);
+        }
+        break;
+
+      default:
+        await enviar(clientOrFn, telefone, 
+          '❌ Comando não reconhecido. Digite *menu* para começar.'
+        );
+        break;
+    }
+
+  } catch (error) {
+    const processingTime = Date.now() - startTime;
+    console.error(`❌ Erro no processamento da mensagem de ${telefone} após ${processingTime}ms:`, {
+      error: error.message,
+      stack: error.stack,
+      telefone,
+      texto,
+      etapa: SESSOES.get(telefone)?.etapa
+    });
+
+    try {
+      await enviar(clientOrFn, telefone, 
+        '❌ Ops! Ocorreu um erro. Digite *reiniciar* para começar novamente.'
+      );
+    } catch (recoveryError) {
+      console.error('❌ Falha ao enviar mensagem de recuperação:', recoveryError.message);
+    }
+  }
+}
+
+/* =================== Inicialização Principal =================== */
+export default async function initBot(client) {
+  try {
+    console.log('🤖 Inicializando bot WhatsApp...');
+
+    const isReady = await waitUntilReady(client, 300000);
+    if (!isReady) {
+      throw new Error('Cliente não ficou pronto em 5 minutos');
+    }
+
+    console.log('✅ Cliente WhatsApp pronto!');
+
+    startConnectionMonitor(client);
+
+    client.onMessage(async (message) => {
+      try {
+        const { from, body, isGroupMsg, author } = message;
+
+        if (isForbiddenJid(from)) {
+          console.log(`🚫 Mensagem ignorada (JID proibido): ${from}`);
           return;
         }
-      }
 
-      default: {
-        resetSessao(telefone);
-        await enviar(clientOrFn, telefone, 'Vamos começar! Envie *menu* para ver o cardápio do dia.');
-        return;
+        if (isGroupMsg) {
+          console.log(`🚫 Mensagem de grupo ignorada: ${from}`);
+          return;
+        }
+
+        if (!isAuthorizedNumber(from)) {
+          console.log(`🚫 Número não autorizado em modo privado: ${from}`);
+          return;
+        }
+
+        if (!body || typeof body !== 'string') {
+          console.log(`🚫 Mensagem sem texto válido de ${from}`);
+          return;
+        }
+
+        console.log(`📱 Nova mensagem de ${from}: "${body}"`);
+
+        await processarMensagem(client, from, body);
+
+      } catch (error) {
+        console.error('❌ Erro no listener de mensagens:', error.message);
       }
-    }
-  } catch (err) {
-    console.error('Erro no fluxo do bot:', err);
+    });
+
+    console.log('🎯 Bot configurado e aguardando mensagens...');
+
+  } catch (error) {
+    console.error('❌ Erro na inicialização do bot:', error.message);
+    stopConnectionMonitor();
+    throw error;
   }
 }
 
-/* =================== Bootstrap chamado pelo server.js =================== */
-/**
- * Export default compatível com o server.js:
- * Ele injeta o `client` já criado e logado.
- */
-export default async function initBot(client) {
-  console.log('🤖 Bot Marmitex: iniciando listeners...');
-
-  // Evita listeners duplicados em hot-reload/start múltiplos
-  if (client.__marmitexListenersMounted) {
-    console.log('ℹ️ Bot Marmitex: listeners já montados; ignorando repetição.');
-    return;
-  }
-  client.__marmitexListenersMounted = true;
-
-  client.onMessage(async (message) => {
-    try {
-      const from = message?.from || '';
-      if (message.isGroupMsg) return;
-      if (isForbiddenJid(from)) {
-        console.warn('[BOT] Ignorando mensagem de origem proibida:', from);
-        return;
-      }
-
-      const telefone = from;
-      const texto = (message.body || '').trim();
-      await processarMensagem(client, telefone, texto);
-    } catch (err) {
-      console.error('Erro no onMessage:', err);
-    }
-  });
-
-  // Logs úteis
-  if (typeof client.onStateChange === 'function') {
-    client.onStateChange((s) => console.log('🤖 [bot] onStateChange:', s));
-  }
-  if (typeof client.onStreamChange === 'function') {
-    client.onStreamChange((s) => console.log('🤖 [bot] onStreamChange:', s));
-  }
-
-  console.log('✅ Bot Marmitex: listeners prontos.');
-}
-
-/* =================== Simulador (painel) =================== */
+/* =================== Funções do Simulador =================== */
 export async function handleMensagemSimulada(texto) {
-  const ts = Date.now();
-  SIM_CONVERSA.push({ who: 'user', text: texto, ts });
+  try {
+    const mockSender = (telefone, resposta) => {
+      SIM_CONVERSA.push({ who: 'bot', text: resposta, ts: Date.now() });
+      console.log(`🤖 [SIMULADOR] Bot: ${resposta}`);
+    };
 
-  const sendSim = async (_tel, resposta) => {
-    SIM_CONVERSA.push({ who: 'bot', text: resposta, ts: Date.now() });
-  };
+    SIM_CONVERSA.push({ who: 'user', text: texto, ts: Date.now() });
+    console.log(`👤 [SIMULADOR] Usuário: ${texto}`);
 
-  await processarMensagem(sendSim, SIM_TEL, texto);
-  return { ok: true, conversa: SIM_CONVERSA.slice(-20) };
+    await processarMensagem(mockSender, SIM_TEL, texto);
+
+  } catch (error) {
+    console.error('❌ Erro no simulador:', error.message);
+    SIM_CONVERSA.push({ who: 'bot', text: 'Erro interno do simulador', ts: Date.now() });
+  }
 }
 
 export function getConversa() {
-  return SIM_CONVERSA.slice(-50);
+  return SIM_CONVERSA;
 }
 
 export function resetConversa() {
   SIM_CONVERSA.length = 0;
   resetSessao(SIM_TEL);
 }
+      

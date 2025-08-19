@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import CadastroCardapio from './components/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
 import Configuracoes from './pages/Configuracoes';
-import SimuladorWhatsApp from './pages/SimuladorWhatsApp';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import NavBar from './components/NavBar';
@@ -44,17 +43,6 @@ export default function App() {
               <NavBar />
               <main className="p-4 sm:p-6">
                 <Configuracoes />
-              </main>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/simulador"
-          element={
-            <ProtectedRoute>
-              <NavBar />
-              <main className="p-4 sm:p-6">
-                <SimuladorWhatsApp />
               </main>
             </ProtectedRoute>
           }

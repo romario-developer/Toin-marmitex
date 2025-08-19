@@ -48,7 +48,7 @@ export default function NavBar() {
         <NavLink to="/cardapio" className={linkCls}>Cadastro de Cardápio</NavLink>
         <NavLink to="/pedidos" className={linkCls}>Pedidos</NavLink>
         <NavLink to="/config" className={linkCls}>Configurações</NavLink>
-        <NavLink to="/simulador" className={linkCls}>Simulador</NavLink>
+        {/* Remover esta linha: <NavLink to="/simulador" className={linkCls}>Simulador</NavLink> */}
       </nav>
 
       {/* Nav mobile dropdown */}
@@ -57,7 +57,7 @@ export default function NavBar() {
           <NavLink to="/cardapio" className={linkCls} onClick={() => setOpen(false)}>Cadastro de Cardápio</NavLink>
           <NavLink to="/pedidos" className={linkCls} onClick={() => setOpen(false)}>Pedidos</NavLink>
           <NavLink to="/config" className={linkCls} onClick={() => setOpen(false)}>Configurações</NavLink>
-          <NavLink to="/simulador" className={linkCls} onClick={() => setOpen(false)}>Simulador</NavLink>
+          {/* Remover esta linha: <NavLink to="/simulador" className={linkCls} onClick={() => setOpen(false)}>Simulador</NavLink> */}
 
           <div className="flex items-center justify-between pt-2 border-t">
             <span className="text-xs text-gray-600 truncate pr-2">{email}</span>

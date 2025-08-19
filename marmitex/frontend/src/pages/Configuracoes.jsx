@@ -52,7 +52,9 @@ export default function Configuracoes() {
         },
         taxaEntrega: Number(data?.taxaEntrega ?? 3)
       });
-    } catch {}
+    } catch (err) {
+      console.error('Erro ao carregar configurações:', err);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -63,7 +65,8 @@ export default function Configuracoes() {
     try {
       await api.post('/api/configuracoes', precos);
       setMsg('✅ Configurações salvas!');
-    } catch {
+    } catch (err) {
+      console.error('Erro ao salvar:', err);
       setMsg('❌ Erro ao salvar.');
     } finally {
       setSalvando(false);
@@ -72,14 +75,84 @@ export default function Configuracoes() {
 
   return (
     <div className="p-3 sm:p-6 max-w-3xl mx-auto">
-      {/* ...restante igual ao seu... */}
-      <div className="mt-4 flex items-center gap-3">
+      <h1 className="text-2xl font-bold mb-6">Configurações</h1>
+      
+      {/* Preços das Marmitas */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Preços das Marmitas</h2>
+        <CurrencyField
+          label="Marmita P"
+          value={precos.precosMarmita.P}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosMarmita: { ...prev.precosMarmita, P: v }
+          }))}
+        />
+        <CurrencyField
+          label="Marmita M"
+          value={precos.precosMarmita.M}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosMarmita: { ...prev.precosMarmita, M: v }
+          }))}
+        />
+        <CurrencyField
+          label="Marmita G"
+          value={precos.precosMarmita.G}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosMarmita: { ...prev.precosMarmita, G: v }
+          }))}
+        />
+      </div>
+
+      {/* Preços das Bebidas */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Preços das Bebidas</h2>
+        <CurrencyField
+          label="Coca Lata"
+          value={precos.precosBebida.lata}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosBebida: { ...prev.precosBebida, lata: v }
+          }))}
+        />
+        <CurrencyField
+          label="Coca 1L"
+          value={precos.precosBebida.umLitro}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosBebida: { ...prev.precosBebida, umLitro: v }
+          }))}
+        />
+        <CurrencyField
+          label="Coca 2L"
+          value={precos.precosBebida.doisLitros}
+          onChange={(v) => setPrecos(prev => ({
+            ...prev,
+            precosBebida: { ...prev.precosBebida, doisLitros: v }
+          }))}
+        />
+      </div>
+
+      {/* Taxa de Entrega */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Taxa de Entrega</h2>
+        <CurrencyField
+          label="Taxa de Entrega"
+          value={precos.taxaEntrega}
+          onChange={(v) => setPrecos(prev => ({ ...prev, taxaEntrega: v }))}
+        />
+      </div>
+
+      {/* Botão Salvar */}
+      <div className="flex items-center gap-3">
         <button
           onClick={salvar}
           disabled={salvando}
-          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700"
+          className="bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
         >
-          {salvando ? 'Salvando...' : 'Salvar'}
+          {salvando ? 'Salvando...' : 'Salvar Configurações'}
         </button>
         {msg && <span className="text-sm">{msg}</span>}
       </div>

@@ -4,8 +4,15 @@ import axios from 'axios';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export default function CadastroCardapio() {
-  // form
-  const [data, setData] = useState(() => new Date().toISOString().substring(0, 10));
+  // form - Corrigir a inicialização da data para evitar problemas de timezone
+  const [data, setData] = useState(() => {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  });
+  // ... existing code ...
   const [c1Desc, setC1Desc] = useState('');
   const [c2Desc, setC2Desc] = useState('');
   const [img1, setImg1] = useState('');
@@ -34,7 +41,12 @@ export default function CadastroCardapio() {
 
   function resetForm() {
     setEditId(null);
-    setData(new Date().toISOString().substring(0, 10));
+    // Aplicar a mesma correção no reset
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    setData(`${ano}-${mes}-${dia}`);
     setC1Desc('');
     setC2Desc('');
     setImg1('');
