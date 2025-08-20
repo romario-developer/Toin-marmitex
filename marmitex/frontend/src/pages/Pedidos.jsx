@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { apiGetPedidos, apiPatchPedido } from '../services/api';
 import StatusBadge from '../components/StatusBadge';
+import { useNotifications } from '../hooks/useNotifications';
 
 function formatBRL(v) {
   try { return Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -11,12 +12,43 @@ function formatDate(d) {
 }
 
 export default function Pedidos() {
-  const [loading, setLoading] = useState(false);
-  const [erro, setErro] = useState('');
   const [pedidos, setPedidos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filtro, setFiltro] = useState('');
+  const [filtroStatus, setFiltroStatus] = useState('');
+  
+  // Função para marcar pedido como pronto (envia notificação)
+  const marcarComoPronto = async (pedidoId) => {
+    try {
+      await apiPatchPedido(pedidoId, { status: 'pronto' });
+      setPedidos(prev => prev.map(p => 
+        p._id === pedidoId ? { ...p, status: 'pronto' } : p
+      ));
+    } catch (error) {
+      console.error('Erro ao marcar como pronto:', error);
+      alert('Erro ao marcar como pronto: ' + error.message);
+    }
+  };
+
+  // Função para marcar pedido como entregue (finaliza automaticamente)
+  const marcarComoEntregue = async (pedidoId) => {
+    try {
+      await apiPatchPedido(pedidoId, { status: 'entregue' });
+      setPedidos(prev => prev.map(p => 
+        p._id === pedidoId ? { ...p, status: 'entregue' } : p
+      ));
+    } catch (error) {
+      console.error('Erro ao marcar como entregue:', error);
+      alert('Erro ao marcar como entregue: ' + error.message);
+    }
+  };
+  const [erro, setErro] = useState('');
   const [busca, setBusca] = useState('');
   const [somentePendentes, setSomentePendentes] = useState(false);
-
+  
+  // Conectar ao sistema de notificações
+  const { notifications } = useNotifications();
+  
   const filtered = useMemo(() => {
     return pedidos.filter((p) => {
       if (somentePendentes && p.statusPagamento !== 'pendente') return false;
@@ -39,20 +71,42 @@ export default function Pedidos() {
     }
   }
   useEffect(() => { carregar(); }, []);
+  
+  // Escutar notificações de novos pedidos
+  useEffect(() => {
+    const novoPedidoNotification = notifications.find(n => 
+      n.type === 'novo-pedido' && !n.processed
+    );
+    
+    if (novoPedidoNotification) {
+      // Adicionar o novo pedido à lista em tempo real
+      setPedidos(prev => [novoPedidoNotification.pedido, ...prev]);
+      // Marcar como processado para evitar duplicatas
+      novoPedidoNotification.processed = true;
+    }
+  }, [notifications]);
 
   async function marcarComoPago(id) {
     try {
       await apiPatchPedido(id, { statusPagamento: 'pago' });
       setPedidos((prev) => prev.map((p) => (p._id === id ? { ...p, statusPagamento: 'pago' } : p)));
-      alert('Pagamento marcado como PAGO.');
-    } catch (e) { alert('Falha ao marcar como pago: ' + e.message); }
+    } catch (e) { 
+      alert('Falha ao marcar como pago: ' + e.message); 
+    }
   }
-  async function finalizarPedido(id) {
+  
+  // Remover completamente a função atualizarStatusPedido e finalizarPedido
+  // async function finalizarPedido(id) { ... }
+
+  async function atualizarStatusPedido(id, novoStatus) {
     try {
-      await apiPatchPedido(id, { status: 'finalizado' });
-      setPedidos((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'finalizado' } : p)));
-      alert('Pedido marcado como FINALIZADO.');
-    } catch (e) { alert('Falha ao finalizar: ' + e.message); }
+      await apiPatchPedido(id, { status: novoStatus });
+      setPedidos((prev) => prev.map((p) => (p._id === id ? { ...p, status: novoStatus } : p)));
+      
+      // Removido o alert de confirmação
+    } catch (e) { 
+      alert('Falha ao atualizar status: ' + e.message); 
+    }
   }
 
   return (
@@ -108,12 +162,17 @@ export default function Pedidos() {
                       <button className="px-3 py-1 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
                         onClick={() => marcarComoPago(p._id)}>Marcar Pago</button>
                     )}
-                    {p.status !== 'finalizado' && (
+                    {p.status === 'em_preparo' && (
                       <button className="px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-                        onClick={() => finalizarPedido(p._id)}>Finalizar</button>
+                        onClick={() => marcarComoPronto(p._id)}>Marcar Pronto</button>
+                    )}
+                    {p.status === 'pronto' && (
+                      <button className="px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                        onClick={() => marcarComoEntregue(p._id)}>Marcar Entregue</button>
                     )}
                   </div>
                 </td>
+                
               </tr>
             ))}
             {filtered.length === 0 && (

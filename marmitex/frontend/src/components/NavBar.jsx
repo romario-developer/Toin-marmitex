@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
+import NotificationCenter from './NotificationCenter';
 
 export default function NavBar() {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ export default function NavBar() {
 
         {/* Desktop actions */}
         <div className="hidden sm:flex gap-2 items-center">
+          <NotificationCenter />
           <span className="text-sm text-gray-600">{email}</span>
           <button
             onClick={sair}
@@ -60,7 +62,10 @@ export default function NavBar() {
           {/* Remover esta linha: <NavLink to="/simulador" className={linkCls} onClick={() => setOpen(false)}>Simulador</NavLink> */}
 
           <div className="flex items-center justify-between pt-2 border-t">
-            <span className="text-xs text-gray-600 truncate pr-2">{email}</span>
+            <div className="flex items-center gap-2">
+              <NotificationCenter />
+              <span className="text-xs text-gray-600 truncate pr-2">{email}</span>
+            </div>
             <button
               onClick={sair}
               className="px-3 py-1 text-xs bg-slate-700 text-white rounded hover:bg-slate-800"
@@ -71,5 +76,14 @@ export default function NavBar() {
         </div>
       )}
     </header>
+  );
+  return (
+    <nav className="bg-white shadow-sm border-b">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between h-16">
+          <NotificationCenter />
+        </div>
+      </div>
+    </nav>
   );
 }

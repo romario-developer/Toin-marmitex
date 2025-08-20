@@ -13,7 +13,16 @@ const PedidoSchema = new mongoose.Schema(
     formaPagamento: { type: String, enum: ['Dinheiro', 'PIX', 'Cartão'], required: true },
     total: { type: Number, required: true },
     statusPagamento: { type: String, enum: ['pendente', 'pago', 'nao_aplicavel'], default: 'nao_aplicavel' },
-    status: { type: String, enum: ['em_preparo', 'finalizado'], default: 'em_preparo' },
+    status: {
+      type: String,
+      enum: ['em_preparo', 'pronto', 'entregue', 'finalizado'],
+      default: 'em_preparo'
+    },
+    tipoEntrega: {
+      type: String,
+      enum: ['retirada', 'delivery'],
+      default: 'delivery'
+    },
     observacoes: { type: String },
     // 🆕 Novos campos para PIX
     pixData: {
