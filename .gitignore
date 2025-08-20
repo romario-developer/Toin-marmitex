@@ -1,8 +1,11 @@
-# WhatsApp Bot tokens e cache
-backend/backend/wpp-tokens/
-backend/backend/qr/
-# Node modules
-node_modules/
-# Cache files
-*.log
-.cache/
+﻿node_modules/
+.env
+.DS_Store
+tokens/
+.wwebjs_auth/
+.wwebjs_cache/
+uploads/*.jpg
+uploads/*.jpeg
+uploads/*.png
+uploads/*.gif
+!uploads/.gitkeep

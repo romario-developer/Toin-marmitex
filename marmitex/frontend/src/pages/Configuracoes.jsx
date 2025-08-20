@@ -31,7 +31,18 @@ export default function Configuracoes() {
   const [precos, setPrecos] = useState({
     precosMarmita: { P: 0, M: 0, G: 0 },
     precosBebida: { lata: 0, umLitro: 0, doisLitros: 0 },
-    taxaEntrega: 3
+    taxaEntrega: 3,
+    horarioFuncionamento: {
+      ativo: true,
+      segunda: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      terca: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      quarta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      quinta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      sexta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+      domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
+      mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+    }
   });
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState('');
@@ -50,7 +61,18 @@ export default function Configuracoes() {
           umLitro: Number(data?.precosBebida?.umLitro ?? 0),
           doisLitros: Number(data?.precosBebida?.doisLitros ?? 0),
         },
-        taxaEntrega: Number(data?.taxaEntrega ?? 3)
+        taxaEntrega: Number(data?.taxaEntrega ?? 3),
+        horarioFuncionamento: data?.horarioFuncionamento ?? {
+          ativo: true,
+          segunda: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          terca: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quarta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quinta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sexta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
+          mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+        }
       });
     } catch (err) {
       console.error('Erro ao carregar configurações:', err);
@@ -143,6 +165,109 @@ export default function Configuracoes() {
           value={precos.taxaEntrega}
           onChange={(v) => setPrecos(prev => ({ ...prev, taxaEntrega: v }))}
         />
+      </div>
+
+      {/* Horário de Funcionamento */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Horário de Funcionamento</h2>
+        
+        <div className="mb-4">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={precos.horarioFuncionamento.ativo}
+              onChange={(e) => setPrecos(prev => ({
+                ...prev,
+                horarioFuncionamento: {
+                  ...prev.horarioFuncionamento,
+                  ativo: e.target.checked
+                }
+              }))}
+            />
+            <span>Ativar controle de horário</span>
+          </label>
+        </div>
+        
+        {precos.horarioFuncionamento.ativo && (
+          <>
+            {['segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado', 'domingo'].map(dia => (
+              <div key={dia} className="flex items-center gap-4 mb-3 p-3 border rounded">
+                <div className="w-20">
+                  <span className="capitalize font-medium">{dia}</span>
+                </div>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={precos.horarioFuncionamento[dia].ativo}
+                    onChange={(e) => setPrecos(prev => ({
+                      ...prev,
+                      horarioFuncionamento: {
+                        ...prev.horarioFuncionamento,
+                        [dia]: {
+                          ...prev.horarioFuncionamento[dia],
+                          ativo: e.target.checked
+                        }
+                      }
+                    }))}
+                  />
+                  <span>Aberto</span>
+                </label>
+                {precos.horarioFuncionamento[dia].ativo && (
+                  <>
+                    <input
+                      type="time"
+                      value={precos.horarioFuncionamento[dia].abertura}
+                      onChange={(e) => setPrecos(prev => ({
+                        ...prev,
+                        horarioFuncionamento: {
+                          ...prev.horarioFuncionamento,
+                          [dia]: {
+                            ...prev.horarioFuncionamento[dia],
+                            abertura: e.target.value
+                          }
+                        }
+                      }))}
+                      className="border rounded px-2 py-1"
+                    />
+                    <span>às</span>
+                    <input
+                      type="time"
+                      value={precos.horarioFuncionamento[dia].fechamento}
+                      onChange={(e) => setPrecos(prev => ({
+                        ...prev,
+                        horarioFuncionamento: {
+                          ...prev.horarioFuncionamento,
+                          [dia]: {
+                            ...prev.horarioFuncionamento[dia],
+                            fechamento: e.target.value
+                          }
+                        }
+                      }))}
+                      className="border rounded px-2 py-1"
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+            
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Mensagem quando fechado:</label>
+              <textarea
+                value={precos.horarioFuncionamento.mensagemForaHorario}
+                onChange={(e) => setPrecos(prev => ({
+                  ...prev,
+                  horarioFuncionamento: {
+                    ...prev.horarioFuncionamento,
+                    mensagemForaHorario: e.target.value
+                  }
+                }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+                rows={4}
+                placeholder="Mensagem que será enviada quando o estabelecimento estiver fechado"
+              />
+            </div>
+          </>
+        )}
       </div>
 
       {/* Botão Salvar */}

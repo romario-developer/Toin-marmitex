@@ -14,6 +14,17 @@ router.get('/', async (_req, res) => {
         precosMarmita: { P: 20, M: 25, G: 30 },
         precosBebida: { lata: 6, umLitro: 10, doisLitros: 14 },
         taxaEntrega: 3,
+        horarioFuncionamento: {
+          ativo: true,
+          segunda: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          terca: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quarta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quinta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sexta: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
+          mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+        }
       });
     }
     res.json(config);
@@ -39,6 +50,21 @@ router.post('/', async (req, res) => {
         doisLitros: Number(req.body?.precosBebida?.doisLitros ?? config.precosBebida.doisLitros ?? 14),
       };
       config.taxaEntrega = Number(req.body?.taxaEntrega ?? config.taxaEntrega ?? 3);
+      
+      // Atualizar horário de funcionamento
+      if (req.body.horarioFuncionamento) {
+        config.horarioFuncionamento = {
+          ativo: req.body.horarioFuncionamento.ativo ?? config.horarioFuncionamento?.ativo ?? true,
+          segunda: req.body.horarioFuncionamento.segunda ?? config.horarioFuncionamento?.segunda ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          terca: req.body.horarioFuncionamento.terca ?? config.horarioFuncionamento?.terca ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quarta: req.body.horarioFuncionamento.quarta ?? config.horarioFuncionamento?.quarta ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          quinta: req.body.horarioFuncionamento.quinta ?? config.horarioFuncionamento?.quinta ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sexta: req.body.horarioFuncionamento.sexta ?? config.horarioFuncionamento?.sexta ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          sabado: req.body.horarioFuncionamento.sabado ?? config.horarioFuncionamento?.sabado ?? { ativo: true, abertura: '11:00', fechamento: '14:00' },
+          domingo: req.body.horarioFuncionamento.domingo ?? config.horarioFuncionamento?.domingo ?? { ativo: false, abertura: '11:00', fechamento: '14:00' },
+          mensagemForaHorario: req.body.horarioFuncionamento.mensagemForaHorario ?? config.horarioFuncionamento?.mensagemForaHorario ?? '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+        };
+      }
     } else {
       config = new Configuracao({
         precosMarmita: {

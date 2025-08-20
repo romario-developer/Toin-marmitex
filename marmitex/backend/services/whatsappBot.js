@@ -23,6 +23,9 @@ const SIM_TEL = '5511999999999@c.us';
 // Monitor de conexão
 let connectionMonitor = null;
 
+// Socket.IO para notificações em tempo real
+let socketIO = null;
+
 /* ======================= CONFIGURAÇÕES DE ESTABILIDADE ======================= */
 const BOT_CONFIG = {
   MAX_RETRY_ATTEMPTS: 3,
@@ -209,11 +212,60 @@ async function buscarCardapioDodia() {
   }
 }
 
+/* =================== Verificação de Horário de Funcionamento =================== */
+async function verificarHorarioFuncionamento() {
+  try {
+    const Configuracao = (await import('../models/Configuracao.js')).default;
+    const config = await Configuracao.findOne();
+    
+    if (!config || !config.horarioFuncionamento || !config.horarioFuncionamento.ativo) {
+      return { aberto: true, mensagem: null };
+    }
+    
+    const agora = new Date();
+    const diaSemana = ['domingo', 'segunda', 'terca', 'quarta', 'quinta', 'sexta', 'sabado'][agora.getDay()];
+    const horarioHoje = config.horarioFuncionamento[diaSemana];
+    
+    if (!horarioHoje || !horarioHoje.ativo) {
+      return {
+        aberto: false,
+        mensagem: config.horarioFuncionamento.mensagemForaHorario
+      };
+    }
+    
+    const horaAtual = agora.getHours() * 60 + agora.getMinutes();
+    const [horaAbertura, minutoAbertura] = horarioHoje.abertura.split(':').map(Number);
+    const [horaFechamento, minutoFechamento] = horarioHoje.fechamento.split(':').map(Number);
+    
+    const minutosAbertura = horaAbertura * 60 + minutoAbertura;
+    const minutosFechamento = horaFechamento * 60 + minutoFechamento;
+    
+    const aberto = horaAtual >= minutosAbertura && horaAtual <= minutosFechamento;
+    
+    return {
+      aberto,
+      mensagem: aberto ? null : config.horarioFuncionamento.mensagemForaHorario
+    };
+    
+  } catch (error) {
+    console.error('❌ Erro ao verificar horário de funcionamento:', error.message);
+    return { aberto: true, mensagem: null }; // Em caso de erro, permite funcionamento
+  }
+}
+
 // Função de processamento - CORRIGIDA
 async function processarMensagem(clientOrFn, telefone, texto) {
   const startTime = Date.now();
 
   try {
+    // Verificar horário de funcionamento ANTES de processar qualquer mensagem
+    const { aberto, mensagem } = await verificarHorarioFuncionamento();
+    
+    if (!aberto) {
+      await enviar(clientOrFn, telefone, mensagem);
+      return;
+    }
+    
     if (!SESSOES.has(telefone)) {
       resetSessao(telefone);
       console.log(`🆕 Nova sessão criada para ${telefone}`);
@@ -415,17 +467,34 @@ Escolha o tamanho da marmita:
 
           const formaPagamento = formasPagamento[tNorm];
           sessao.dados.formaPagamento = formaPagamento;
-          // Remover endereço - definir como padrão
-          sessao.dados.endereco = 'Retirada no local';
+          
+          // Perguntar sobre tipo de entrega
+          sessao.etapa = 'entrega';
+          await enviar(clientOrFn, telefone, 
+            `Como você prefere receber seu pedido?\n\n` +
+            `1️⃣ Delivery (entrega)\n` +
+            `2️⃣ Retirada no local`
+          );
+        }
+        break;
 
-          if (formaPagamento === 'Dinheiro') {
+      case 'entrega':
+        if (['1', '2'].includes(tNorm)) {
+          const tiposEntrega = {
+            '1': 'delivery',
+            '2': 'retirada'
+          };
+          
+          sessao.dados.tipoEntrega = tiposEntrega[tNorm];
+          
+          if (sessao.dados.formaPagamento === 'Dinheiro') {
             sessao.etapa = 'troco';
             await enviar(clientOrFn, telefone, 
               `Precisa de troco?\n\n` +
               `1️⃣ Sim\n` +
               `2️⃣ Não (valor exato)`
             );
-          } else if (formaPagamento === 'PIX') {
+          } else if (sessao.dados.formaPagamento === 'PIX') {
             await finalizarPedido(clientOrFn, telefone, sessao);
 
             const pedidoSalvo = await Pedido.findOne({ 
@@ -515,10 +584,18 @@ Escolha o tamanho da marmita:
 }
 
 /* =================== Inicialização Principal =================== */
-export default async function initBot(client) {
-  try {
-    console.log('🤖 Inicializando bot WhatsApp...');
+export default async function initBot(client, io) {
+  socketIO = io;
+  whatsappClient = client; // ✅ Armazenar cliente globalmente
+  
+  if (!client) {
+    console.error('❌ Cliente WhatsApp não fornecido');
+    return;
+  }
 
+  console.log('🤖 Inicializando bot WhatsApp...');
+  
+  try { // ✅ ADICIONAR ESTE TRY
     const isReady = await waitUntilReady(client, 300000);
     if (!isReady) {
       throw new Error('Cliente não ficou pronto em 5 minutos');
@@ -606,12 +683,13 @@ async function finalizarPedido(clientOrFn, telefone, sessao) {
     const pedidoData = {
       telefone: telefone,
       cardapio: {
-        tipo: sessao.dados.cardapio.tipo,  // Agora será 'CARDÁPIO 1' ou 'CARDÁPIO 2'
-        itens: [sessao.dados.cardapio.descricao]  // Descrição vai para itens
+        tipo: sessao.dados.cardapio.tipo,
+        itens: [sessao.dados.cardapio.descricao]
       },
       tamanho: sessao.dados.tamanho,
       bebida: sessao.dados.bebida,
       formaPagamento: sessao.dados.formaPagamento,
+      tipoEntrega: sessao.dados.tipoEntrega || 'delivery', // Default delivery
       total: sessao.dados.precoTotal,
       statusPagamento: sessao.dados.formaPagamento === 'PIX' ? 'pendente' : 'nao_aplicavel',
       status: 'em_preparo',
@@ -635,6 +713,18 @@ async function finalizarPedido(clientOrFn, telefone, sessao) {
     const pedido = await Pedido.create(pedidoData);
     console.log(`✅ Pedido salvo: ${pedido._id}`);
     
+    // ✅ Emitir notificação em tempo real
+    if (socketIO) {
+      socketIO.to('admin-room').emit('novo-pedido', {
+        pedido,
+        timestamp: new Date(),
+        message: `Novo pedido recebido de ${pedido.telefone}`
+      });
+      console.log('📢 Notificação emitida para admin-room');
+    } else {
+      console.warn('⚠️ Socket.IO não disponível para emitir notificação');
+    }
+    
     return pedido;
   } catch (error) {
     console.error('❌ Erro ao finalizar pedido:', error.message);
@@ -650,8 +740,7 @@ async function enviarPIXComBotao(clientOrFn, telefone, pedido) {
         `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
         `📋 Pedido: ${pedido._id}\n\n` +
         `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
-        `⏰ Válido por 30 minutos\n\n` +
-        `Após pagar, o sistema confirmará automaticamente!`;
+        `⏰ O pagamento será confirmado automaticamente!`;
       
       await enviar(clientOrFn, telefone, mensagemPIX);
     } else {
@@ -660,7 +749,7 @@ async function enviarPIXComBotao(clientOrFn, telefone, pedido) {
         `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
         `📋 Pedido: ${pedido._id}\n\n` +
         `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
-        `Após pagar, envie "paguei" para confirmar!`;
+        `⏰ O pagamento será confirmado automaticamente!`;
       
       await enviar(clientOrFn, telefone, mensagemPIXSimples);
     }
@@ -692,6 +781,27 @@ export async function enviarMensagemConfirmacao(telefone, pedido) {
     
   } catch (error) {
     console.error('❌ Erro ao enviar confirmação:', error.message);
+  }
+}
+
+// Função para enviar mensagens (usada pelo sistema de notificações)
+let whatsappClient = null;
+
+export async function enviarMensagem(telefone, mensagem) {
+  try {
+    if (!whatsappClient) {
+      console.warn('⚠️ Cliente WhatsApp não disponível para envio de mensagem');
+      return false;
+    }
+
+    const telefoneFormatado = telefone.includes('@c.us') ? telefone : `${telefone}@c.us`;
+    
+    await whatsappClient.sendText(telefoneFormatado, mensagem);
+    console.log(`✅ Mensagem de status enviada para ${telefoneFormatado}`);
+    return true;
+  } catch (error) {
+    console.error(`❌ Erro ao enviar mensagem para ${telefone}:`, error.message);
+    return false;
   }
 }
       

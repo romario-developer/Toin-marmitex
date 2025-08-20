@@ -130,8 +130,9 @@ export default function Pedidos() {
 
       {erro && <div className="mb-4 p-3 rounded bg-red-50 text-red-700 border border-red-200">Erro: {erro}</div>}
 
-      <div className="overflow-auto border rounded-xl">
-        <table className="min-w-[900px] w-full text-sm">
+      {/* Layout Desktop - Tabela */}
+      <div className="hidden lg:block overflow-auto border rounded-xl">
+        <table className="w-full text-sm">
           <thead className="bg-gray-50">
             <tr className="text-left">
               <th className="px-3 py-2">Data</th>
@@ -154,7 +155,7 @@ export default function Pedidos() {
                 <td className="px-3 py-2">{p.tamanho}</td>
                 <td className="px-3 py-2">{p.bebida}</td>
                 <td className="px-3 py-2 whitespace-nowrap">{formatBRL(p.total)}</td>
-                <td className="px-3 py-2"><StatusBadge type="pagamento" value={p.statusPagamento} /></td>
+                <td className="px-3 py-2"><StatusBadge type="formaPagamento" value={p.formaPagamento} /></td>
                 <td className="px-3 py-2"><StatusBadge type="pedido" value={p.status} /></td>
                 <td className="px-3 py-2">
                   <div className="flex gap-2">
@@ -172,7 +173,6 @@ export default function Pedidos() {
                     )}
                   </div>
                 </td>
-                
               </tr>
             ))}
             {filtered.length === 0 && (
@@ -180,6 +180,66 @@ export default function Pedidos() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Layout Mobile - Cards */}
+      <div className="lg:hidden space-y-4">
+        {filtered.map((p) => (
+          <div key={p._id} className="bg-white border rounded-lg p-4 shadow-sm">
+            {/* Header do Card */}
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <div className="text-sm font-medium text-gray-900">{p?.cardapio?.tipo}</div>
+                <div className="text-xs text-gray-500">{formatDate(p.createdAt)}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-semibold text-gray-900">{formatBRL(p.total)}</div>
+                <StatusBadge type="pedido" value={p.status} />
+              </div>
+            </div>
+
+            {/* Detalhes do Pedido */}
+            <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+              <div>
+                <span className="text-gray-500">Tamanho:</span>
+                <span className="ml-1 font-medium">{p.tamanho}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Bebida:</span>
+                <span className="ml-1 font-medium">{p.bebida}</span>
+              </div>
+              <div>
+                <span className="text-gray-500">Pagamento:</span>
+                <span className="ml-1"><StatusBadge type="formaPagamento" value={p.formaPagamento} /></span>
+              </div>
+              {p.statusPagamento === 'pendente' && (
+                <div>
+                  <span className="text-gray-500">Status Pag:</span>
+                  <span className="ml-1"><StatusBadge type="pagamento" value={p.statusPagamento} /></span>
+                </div>
+              )}
+            </div>
+
+            {/* Ações */}
+            <div className="flex gap-2 flex-wrap">
+              {p.statusPagamento === 'pendente' && (
+                <button className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 text-sm"
+                  onClick={() => marcarComoPago(p._id)}>Marcar Pago</button>
+              )}
+              {p.status === 'em_preparo' && (
+                <button className="flex-1 px-3 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                  onClick={() => marcarComoPronto(p._id)}>Marcar Pronto</button>
+              )}
+              {p.status === 'pronto' && (
+                <button className="flex-1 px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 text-sm"
+                  onClick={() => marcarComoEntregue(p._id)}>Marcar Entregue</button>
+              )}
+            </div>
+          </div>
+        ))}
+        {filtered.length === 0 && (
+          <div className="text-center py-8 text-gray-500">Nenhum pedido encontrado.</div>
+        )}
       </div>
     </div>
   );

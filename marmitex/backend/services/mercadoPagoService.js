@@ -17,7 +17,7 @@ export const criarPagamentoPIX = async (pedidoData) => {
         email: 'cliente@email.com',
         identification: {
           type: 'CPF',
-          number: '12345678901'
+          number: '11144477735' // CPF válido para testes
         }
       },
       notification_url: `${process.env.BASE_URL}/api/webhooks/mercadopago`

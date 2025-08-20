@@ -63,3 +63,19 @@ coverage/
 npm-debug.log*
 .yarn/*
 .pnpm-store/*
+# WhatsApp Bot tokens e cache
+backend/backend/wpp-tokens/
+backend/backend/qr/
+# Node modules
+node_modules/
+# Cache files
+*.log
+.cache/
+# WhatsApp Bot tokens e cache
+backend/backend/wpp-tokens/
+backend/backend/qr/
+# Node modules
+node_modules/
+# Cache files
+*.log
+.cache/

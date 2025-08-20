@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { startClient, getClient, waitUntilReady } from './config/wppconnect.js';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 /* =========================
    Paths / Constantes
@@ -211,7 +213,7 @@ async function connectMongo() {
 /* =========================
    WhatsApp (WPPConnect)
 ========================= */
-async function initWhatsApp() {
+async function initWhatsApp(io) {
   try {
     console.log('🤖 Inicializando WhatsApp...');
     
@@ -232,13 +234,13 @@ async function initWhatsApp() {
       console.log('🎉 WhatsApp logado e pronto!');
     }
 
-    await mountWhatsAppBot(client);
+    await mountWhatsAppBot(client, io);
   } catch (err) {
     console.error('❌ Erro ao iniciar WhatsApp:', err.message);
   }
 }
 
-async function mountWhatsAppBot(client) {
+async function mountWhatsAppBot(client, io) {
   const botPath = path.resolve(__dirname, './services/whatsappBot.js');
   if (!fs.existsSync(botPath)) {
     console.warn('⚠️  services/whatsappBot.js não encontrado — seguindo sem fluxo do bot.');
@@ -249,13 +251,13 @@ async function mountWhatsAppBot(client) {
     const mod = await import(pathToFileURL(botPath).href);
 
     if (typeof mod?.default === 'function') {
-      await mod.default(client);
+      await mod.default(client, io); // ✅ Passar io
       console.log('🤖 whatsappBot (default) inicializado.');
       return;
     }
     
     if (typeof mod?.initBot === 'function') {
-      await mod.initBot(client);
+      await mod.initBot(client, io); // ✅ Passar io
       console.log('🤖 whatsappBot (initBot) inicializado.');
       return;
     }
@@ -280,14 +282,43 @@ async function start() {
     await mountApiRoutes();
 
     // Sobe servidor HTTP
-    const server = app.listen(PORT, () => {
-      console.log(`🌐 API rodando em http://localhost:${PORT}`);
-      console.log(`📱 QR Code: http://localhost:${PORT}/qr/view`);
-      console.log(`🔍 Health Check: http://localhost:${PORT}/healthz`);
+    const server = createServer(app);
+    
+    // Configurar Socket.IO
+    const io = new Server(server, {
+      cors: {
+        origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
+        credentials: true,
+      },
+    });
+    
+    // Middleware para disponibilizar io em todas as rotas
+    app.use((req, res, next) => {
+      req.io = io;
+      next();
+    });
+    
+    // Gerenciar conexões WebSocket
+    io.on('connection', (socket) => {
+      console.log('Admin conectado:', socket.id);
+      
+      socket.on('join-admin', () => {
+        socket.join('admin-room');
+        console.log('Admin entrou na sala de notificações');
+      });
+      
+      socket.on('disconnect', () => {
+        console.log('Admin desconectado:', socket.id);
+      });
     });
 
-    // Inicia WhatsApp client
-    await initWhatsApp();
+    // Inicia WhatsApp client COM o Socket.IO
+    await initWhatsApp(io);
+    
+    // Iniciar servidor
+    server.listen(PORT, () => {
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    });
 
     // Encerramento gracioso
     const shutdown = async (signal) => {
