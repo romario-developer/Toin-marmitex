@@ -581,12 +581,7 @@ Escolha o tamanho da marmita:
               `2️⃣ Não (valor exato)`
             );
           } else if (sessao.dados.formaPagamento === 'PIX') {
-            await finalizarPedido(clientOrFn, telefone, sessao);
-
-            const pedidoSalvo = await Pedido.findOne({ 
-              telefone, 
-              statusPagamento: 'nao_aplicavel' 
-            }).sort({ createdAt: -1 });
+            const pedidoSalvo = await finalizarPedido(clientOrFn, telefone, sessao);
 
             if (pedidoSalvo) {
               await enviarPIXComBotao(clientOrFn, telefone, pedidoSalvo);
@@ -785,19 +780,41 @@ async function finalizarPedido(clientOrFn, telefone, sessao) {
     // Se for PIX, criar dados do pagamento
     if (sessao.dados.formaPagamento === 'PIX') {
       try {
+        console.log('💳 Criando pagamento PIX no Mercado Pago...');
         const pixData = await criarPagamentoPIX({
           _id: 'temp', // Será substituído pelo ID real
           total: sessao.dados.precoTotal,
           cardapio: { tipo: sessao.dados.cardapio.tipo }
         });
+        console.log('✅ PIX criado com sucesso:', {
+          transactionId: pixData.transactionId,
+          temQrCode: !!pixData.qrCode,
+          temQrCodeBase64: !!pixData.qrCodeBase64,
+          mercadoPagoId: pixData.mercadoPagoId
+        });
         pedidoData.pixData = pixData;
       } catch (pixError) {
-        console.warn('⚠️ Erro ao criar PIX, salvando pedido sem dados PIX:', pixError.message);
+        console.error('❌ Erro ao criar PIX no Mercado Pago:', pixError.message);
+        console.error('Stack trace:', pixError.stack);
+        console.warn('⚠️ Salvando pedido sem dados PIX (fallback para chave manual)');
       }
     }
 
     const pedido = await Pedido.create(pedidoData);
     console.log(`✅ Pedido salvo: ${pedido._id}`);
+    
+    // Log para verificar se os dados PIX foram salvos corretamente
+    if (pedido.pixData) {
+      console.log('💾 Dados PIX salvos no banco:', {
+        transactionId: pedido.pixData.transactionId,
+        temQrCode: !!pedido.pixData.qrCode,
+        qrCodeLength: pedido.pixData.qrCode ? pedido.pixData.qrCode.length : 0,
+        temQrCodeBase64: !!pedido.pixData.qrCodeBase64,
+        mercadoPagoId: pedido.pixData.mercadoPagoId
+      });
+    } else {
+      console.log('⚠️ Nenhum dado PIX foi salvo no banco');
+    }
     
     // ✅ Emitir notificação em tempo real
     if (socketIO) {
@@ -821,23 +838,43 @@ async function finalizarPedido(clientOrFn, telefone, sessao) {
 // Função para enviar informações do PIX
 async function enviarPIXComBotao(clientOrFn, telefone, pedido) {
   try {
+    console.log('🔍 Dados PIX do pedido:', {
+      temPixData: !!pedido.pixData,
+      temQrCode: !!(pedido.pixData && pedido.pixData.qrCode),
+      pixDataKeys: pedido.pixData ? Object.keys(pedido.pixData) : 'N/A'
+    });
+
     if (pedido.pixData && pedido.pixData.qrCode) {
-      const mensagemPIX = `🔑 *PIX para Pagamento*\n\n` +
+      // Enviar código PIX copiável do Mercado Pago
+      const mensagemPIX = `🔑 *PIX para Pagamento - Mercado Pago*\n\n` +
         `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
         `📋 Pedido: ${pedido._id}\n\n` +
-        `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
-        `⏰ O pagamento será confirmado automaticamente!`;
+        `📱 *Código PIX (Copie e Cole):*`;
       
       await enviar(clientOrFn, telefone, mensagemPIX);
+      
+      // Enviar o código PIX em mensagem separada para facilitar a cópia
+      await enviar(clientOrFn, telefone, pedido.pixData.qrCode);
+      
+      // Enviar informações adicionais
+      const infoAdicional = `⏰ O pagamento será confirmado automaticamente!\n⌛ Válido por 30 minutos`;
+      await enviar(clientOrFn, telefone, infoAdicional);
     } else {
-      // Fallback se não tiver dados do Mercado Pago
+      // Fallback para chave PIX manual
+      console.log('⚠️ Sem dados do Mercado Pago, usando chave PIX manual');
       const mensagemPIXSimples = `🔑 *PIX para Pagamento*\n\n` +
         `💰 Valor: R$ ${pedido.total.toFixed(2).replace('.', ',')}\n` +
         `📋 Pedido: ${pedido._id}\n\n` +
-        `📱 *Chave PIX:*\n${PIX_KEY}\n\n` +
-        `⏰ O pagamento será confirmado automaticamente!`;
+        `📱 *Chave PIX (Copie e Cole):*`;
       
       await enviar(clientOrFn, telefone, mensagemPIXSimples);
+      
+      // Enviar a chave PIX em mensagem separada para facilitar a cópia
+      await enviar(clientOrFn, telefone, PIX_KEY);
+      
+      // Enviar informações adicionais
+      const infoAdicional = `⏰ O pagamento será confirmado automaticamente!`;
+      await enviar(clientOrFn, telefone, infoAdicional);
     }
   } catch (error) {
     console.error('❌ Erro ao enviar PIX:', error.message);
