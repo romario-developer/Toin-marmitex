@@ -42,6 +42,11 @@ export default function Configuracoes() {
       sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
       domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
       mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+    },
+    delaysMensagens: {
+      antesCardapio: 2000,
+      entreCardapios: 1500,
+      antesEscolha: 1000
     }
   });
   const [salvando, setSalvando] = useState(false);
@@ -72,6 +77,11 @@ export default function Configuracoes() {
           sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
           domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
           mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+        },
+        delaysMensagens: data?.delaysMensagens ?? {
+          antesCardapio: 2000,
+          entreCardapios: 1500,
+          antesEscolha: 1000
         }
       });
     } catch (err) {
@@ -268,6 +278,88 @@ export default function Configuracoes() {
             </div>
           </>
         )}
+      </div>
+
+      {/* Delays das Mensagens do Bot */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h2 className="text-lg font-semibold mb-4">⏱️ Tempos das Mensagens do Bot</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Configure o tempo de espera entre as mensagens do bot (em milissegundos).
+          Valores entre 500ms e 10000ms (10 segundos).
+        </p>
+        
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-sm font-medium">Antes de mostrar o cardápio:</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="500"
+                max="10000"
+                step="100"
+                value={precos.delaysMensagens.antesCardapio}
+                onChange={(e) => setPrecos(prev => ({
+                  ...prev,
+                  delaysMensagens: {
+                    ...prev.delaysMensagens,
+                    antesCardapio: Number(e.target.value)
+                  }
+                }))}
+                className="w-20 border rounded px-2 py-1 text-sm text-center"
+              />
+              <span className="text-xs text-gray-500">ms</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-sm font-medium">Entre cardápio 1 e 2:</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="500"
+                max="10000"
+                step="100"
+                value={precos.delaysMensagens.entreCardapios}
+                onChange={(e) => setPrecos(prev => ({
+                  ...prev,
+                  delaysMensagens: {
+                    ...prev.delaysMensagens,
+                    entreCardapios: Number(e.target.value)
+                  }
+                }))}
+                className="w-20 border rounded px-2 py-1 text-sm text-center"
+              />
+              <span className="text-xs text-gray-500">ms</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-sm font-medium">Antes da mensagem de escolha:</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="500"
+                max="10000"
+                step="100"
+                value={precos.delaysMensagens.antesEscolha}
+                onChange={(e) => setPrecos(prev => ({
+                  ...prev,
+                  delaysMensagens: {
+                    ...prev.delaysMensagens,
+                    antesEscolha: Number(e.target.value)
+                  }
+                }))}
+                className="w-20 border rounded px-2 py-1 text-sm text-center"
+              />
+              <span className="text-xs text-gray-500">ms</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="mt-4 p-3 bg-blue-50 rounded text-sm text-blue-700">
+          <strong>💡 Dica:</strong> Valores maiores fazem o bot parecer mais "humano", 
+          mas podem deixar a conversa mais lenta. Recomendado: 1000-3000ms.
+        </div>
       </div>
 
       {/* Botão Salvar */}

@@ -59,6 +59,26 @@ const configuracaoSchema = new mongoose.Schema({
       type: String,
       default: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
     }
+  },
+  delaysMensagens: {
+    antesCardapio: {
+      type: Number,
+      default: 2000,
+      min: 500,
+      max: 10000
+    },
+    entreCardapios: {
+      type: Number,
+      default: 1500,
+      min: 500,
+      max: 10000
+    },
+    antesEscolha: {
+      type: Number,
+      default: 1000,
+      min: 500,
+      max: 10000
+    }
   }
 });
 

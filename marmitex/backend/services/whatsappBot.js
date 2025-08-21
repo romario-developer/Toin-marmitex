@@ -57,6 +57,60 @@ const MODO_PRIVADO = process.env.MODO_PRIVADO === 'true';
 const WHATSAPP_ALLOWED = process.env.WHATSAPP_ALLOWED || '557391472169,9848494243912';
 const NUMEROS_PERMITIDOS = WHATSAPP_ALLOWED.split(',').map(num => num.trim());
 
+/* =================== Funções de Identificação de Cliente =================== */
+// Função para verificar se o cliente já fez pedidos no mesmo dia
+async function verificarClienteRecorrente(telefone) {
+  try {
+    const telefoneNormalizado = normalizarTelefone(telefone);
+    
+    // Obter início e fim do dia atual
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 0, 0, 0, 0);
+    const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
+    
+    // Buscar pedidos finalizados do cliente APENAS do dia atual
+    const pedidosHoje = await Pedido.find({
+      telefone: telefoneNormalizado,
+      status: { $in: ['entregue', 'finalizado'] },
+      createdAt: {
+        $gte: inicioHoje,
+        $lte: fimHoje
+      }
+    }).sort({ createdAt: -1 });
+    
+    return {
+      isRecorrente: pedidosHoje.length > 0,
+      totalPedidos: pedidosHoje.length,
+      ultimoPedido: pedidosHoje[0] || null
+    };
+  } catch (error) {
+    console.error('❌ Erro ao verificar cliente recorrente:', error);
+    return {
+      isRecorrente: false,
+      totalPedidos: 0,
+      ultimoPedido: null
+    };
+  }
+}
+
+// Função para gerar mensagem personalizada para cliente recorrente do dia
+function gerarMensagemBoasVindas(clienteInfo) {
+  if (!clienteInfo.isRecorrente) {
+    return '👋 Olá! Bem-vindo(a) à nossa marmitaria! 🍽️\n\nVamos ver o cardápio de hoje:';
+  }
+  
+  const mensagensRecorrente = [
+    `🤗 Olá novamente! Que bom ter você de volta hoje! 🍽️\n\nEste é seu ${clienteInfo.totalPedidos + 1}º pedido do dia. Vamos ver o cardápio:`,
+    `😊 Oi! Bem-vindo(a) de volta! 🍽️\n\nVejo que você já pediu hoje! Que tal mais uma delícia?`,
+    `👋 Olá! Que alegria vê-lo(a) novamente hoje! 🍽️\n\nJá está com fome de novo? Confira nosso cardápio:`,
+    `🙌 Oi! De volta por aqui hoje! 🍽️\n\nAdoro clientes que apreciam nossa comida! Vamos ver o que temos:`,
+    `😄 Olá! Que bom ter você aqui novamente hoje! 🍽️\n\nMais um pedido? Fico feliz! Cardápio de hoje:`
+  ];
+  
+  // Escolher uma mensagem aleatória
+  return mensagensRecorrente[Math.floor(Math.random() * mensagensRecorrente.length)];
+}
+
 /* =================== Funções de Monitoramento =================== */
 function startConnectionMonitor(client) {
   console.log('🔄 Iniciando monitor de conexão...');
@@ -161,17 +215,29 @@ function normalizarTexto(texto) {
     .replace(/\s+/g, ' '); // Normaliza espaços
 }
 
+// Função para normalizar formato do telefone WhatsApp
+function normalizarTelefone(telefone) {
+  // Se já tem formato válido (@c.us ou @lid), retorna como está
+  if (telefone.includes('@c.us') || telefone.includes('@lid')) {
+    return telefone;
+  }
+  // Se não tem formato, assume que é celular e adiciona @c.us
+  return `${telefone}@c.us`;
+}
+
 // Função para enviar mensagens
 async function enviar(clientOrFn, telefone, mensagem) {
   try {
+    const telefoneFormatado = normalizarTelefone(telefone);
+    
     if (typeof clientOrFn === 'function') {
       // Modo simulador
-      clientOrFn(telefone, mensagem);
+      clientOrFn(telefoneFormatado, mensagem);
     } else {
       // Modo real
-      await clientOrFn.sendText(telefone, mensagem);
+      await clientOrFn.sendText(telefoneFormatado, mensagem);
     }
-    console.log(`✅ Mensagem enviada para ${telefone}: ${mensagem.substring(0, 50)}...`);
+    console.log(`✅ Mensagem enviada para ${telefoneFormatado}: ${mensagem.substring(0, 50)}...`);
   } catch (error) {
     console.error(`❌ Erro ao enviar mensagem para ${telefone}:`, error.message);
     throw error;
@@ -303,11 +369,31 @@ async function processarMensagem(clientOrFn, telefone, texto) {
 
     switch (sessao.etapa) {
       case 'inicio':
-        // Mensagem de boas-vindas primeiro
-        await enviar(clientOrFn, telefone, '👋 Olá! Bem-vindo(a) à nossa marmitaria! 🍽️\n\nVamos ver o cardápio de hoje:');
+        // Verificar se é cliente recorrente
+        const clienteInfo = await verificarClienteRecorrente(telefone);
         
-        // Aguardar 2 segundos antes de mostrar o cardápio
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Mensagem de boas-vindas personalizada
+        const mensagemBoasVindas = gerarMensagemBoasVindas(clienteInfo);
+        await enviar(clientOrFn, telefone, mensagemBoasVindas);
+        
+        // Log para acompanhamento
+        if (clienteInfo.isRecorrente) {
+          console.log(`🔄 Cliente recorrente do dia detectado: ${telefone} (${clienteInfo.totalPedidos} pedidos hoje)`);
+        } else {
+          console.log(`🆕 Primeiro pedido do dia: ${telefone}`);
+        }
+        
+        // Buscar configurações de delay
+        const Configuracao = (await import('../models/Configuracao.js')).default;
+        const config = await Configuracao.findOne();
+        const delays = config?.delaysMensagens || {
+          antesCardapio: 2000,
+          entreCardapios: 1500,
+          antesEscolha: 1000
+        };
+        
+        // Aguardar tempo configurado antes de mostrar o cardápio
+        await new Promise(resolve => setTimeout(resolve, delays.antesCardapio));
         
         // QUALQUER mensagem inicial mostra o cardápio (como estava antes)
         const cardapio = await buscarCardapioDodia();
@@ -331,8 +417,8 @@ async function processarMensagem(clientOrFn, telefone, texto) {
           await enviar(clientOrFn, telefone, `📋 *Cardápio 1*: ${cardapio.cardapio1.descricao}`);
         }
         
-        // Aguardar 1.5 segundos antes de mostrar o cardápio 2
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Aguardar tempo configurado antes de mostrar o cardápio 2
+        await new Promise(resolve => setTimeout(resolve, delays.entreCardapios));
         
         // Enviar cardápio 2 com imagem e descrição
         if (cardapio.cardapio2?.imagem) {
@@ -353,8 +439,8 @@ async function processarMensagem(clientOrFn, telefone, texto) {
           await enviar(clientOrFn, telefone, `📋 *Cardápio 2*: ${cardapio.cardapio2.descricao}`);
         }
         
-        // Aguardar 1 segundo antes da mensagem de escolha
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Aguardar tempo configurado antes da mensagem de escolha
+        await new Promise(resolve => setTimeout(resolve, delays.antesEscolha));
         
         // Enviar mensagem de escolha SEM o título \"Cardápio de Hoje\"
         const textoEscolha = `Digite o número do cardápio desejado:\n1️⃣ Cardápio 1\n2️⃣ Cardápio 2`;
@@ -794,7 +880,7 @@ export async function enviarMensagem(telefone, mensagem) {
       return false;
     }
 
-    const telefoneFormatado = telefone.includes('@c.us') ? telefone : `${telefone}@c.us`;
+    const telefoneFormatado = normalizarTelefone(telefone);
     
     await whatsappClient.sendText(telefoneFormatado, mensagem);
     console.log(`✅ Mensagem de status enviada para ${telefoneFormatado}`);

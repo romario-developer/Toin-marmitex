@@ -24,6 +24,11 @@ router.get('/', async (_req, res) => {
           sabado: { ativo: true, abertura: '11:00', fechamento: '14:00' },
           domingo: { ativo: false, abertura: '11:00', fechamento: '14:00' },
           mensagemForaHorario: '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
+        },
+        delaysMensagens: {
+          antesCardapio: 2000,
+          entreCardapios: 1500,
+          antesEscolha: 1000
         }
       });
     }
@@ -65,6 +70,15 @@ router.post('/', async (req, res) => {
           mensagemForaHorario: req.body.horarioFuncionamento.mensagemForaHorario ?? config.horarioFuncionamento?.mensagemForaHorario ?? '🕐 Desculpe, estamos fechados no momento.\n\n📅 Nosso horário de funcionamento:\nSegunda a Sábado: 11:00 às 14:00\nDomingo: Fechado\n\n⏰ Volte durante nosso horário de atendimento!'
         };
       }
+      
+      // Atualizar delays das mensagens
+      if (req.body.delaysMensagens) {
+        config.delaysMensagens = {
+          antesCardapio: Number(req.body.delaysMensagens.antesCardapio ?? config.delaysMensagens?.antesCardapio ?? 2000),
+          entreCardapios: Number(req.body.delaysMensagens.entreCardapios ?? config.delaysMensagens?.entreCardapios ?? 1500),
+          antesEscolha: Number(req.body.delaysMensagens.antesEscolha ?? config.delaysMensagens?.antesEscolha ?? 1000)
+        };
+      }
     } else {
       config = new Configuracao({
         precosMarmita: {
@@ -78,6 +92,11 @@ router.post('/', async (req, res) => {
           doisLitros: Number(req.body?.precosBebida?.doisLitros ?? 14),
         },
         taxaEntrega: Number(req.body?.taxaEntrega ?? 3),
+        delaysMensagens: {
+          antesCardapio: Number(req.body?.delaysMensagens?.antesCardapio ?? 2000),
+          entreCardapios: Number(req.body?.delaysMensagens?.entreCardapios ?? 1500),
+          antesEscolha: Number(req.body?.delaysMensagens?.antesEscolha ?? 1000)
+        }
       });
     }
     await config.save();
