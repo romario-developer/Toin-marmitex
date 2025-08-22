@@ -140,6 +140,7 @@ export default function Pedidos() {
               <th className="px-3 py-2">Cardápio</th>
               <th className="px-3 py-2">Tam.</th>
               <th className="px-3 py-2">Bebida</th>
+              <th className="px-3 py-2">Entrega</th>
               <th className="px-3 py-2">Total</th>
               <th className="px-3 py-2">Pagamento</th>
               <th className="px-3 py-2">Status</th>
@@ -154,6 +155,13 @@ export default function Pedidos() {
                 <td className="px-3 py-2">{p?.cardapio?.tipo}</td>
                 <td className="px-3 py-2">{p.tamanho}</td>
                 <td className="px-3 py-2">{p.bebida}</td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  {p.tipoEntrega === 'delivery' ? (
+                    <span className="text-blue-600">🚚 Delivery (+{formatBRL(p.taxaEntrega || 0)})</span>
+                  ) : (
+                    <span className="text-green-600">🏪 Retirada</span>
+                  )}
+                </td>
                 <td className="px-3 py-2 whitespace-nowrap">{formatBRL(p.total)}</td>
                 <td className="px-3 py-2"><StatusBadge type="formaPagamento" value={p.formaPagamento} /></td>
                 <td className="px-3 py-2"><StatusBadge type="pedido" value={p.status} /></td>
@@ -176,7 +184,7 @@ export default function Pedidos() {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={9} className="px-3 py-6 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
+              <tr><td colSpan={10} className="px-3 py-6 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>
             )}
           </tbody>
         </table>

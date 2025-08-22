@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import CadastroCardapio from './components/CadastroCardapio';
+import CadastroCardapio from './pages/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
 import Configuracoes from './pages/Configuracoes';
 import Login from './pages/Login';

@@ -23,10 +23,45 @@ export const salvarCardapio = async (req, res) => {
       return res.status(400).json({ erro: 'Já existe um cardápio cadastrado para esta data.' });
     }
 
+    // Processar cardápios dinâmicos
+    const cardapios = [];
+    if (req.body.cardapios && Array.isArray(req.body.cardapios)) {
+      req.body.cardapios.forEach((cardapio, index) => {
+        if (cardapio.item && cardapio.item.descricao) {
+          cardapios.push({
+            numero: cardapio.numero || (index + 1),
+            item: {
+              descricao: cardapio.item.descricao,
+              imagem: cardapio.item.imagem || ''
+            }
+          });
+        }
+      });
+    }
+    
+    // Se não houver cardápios válidos, criar cardápios padrão
+    if (cardapios.length === 0) {
+      cardapios.push(
+        {
+          numero: 1,
+          item: {
+            descricao: req.body.cardapio1?.descricao || 'Feijoada Completa',
+            imagem: req.body.cardapio1?.imagem || ''
+          }
+        },
+        {
+          numero: 2,
+          item: {
+            descricao: req.body.cardapio2?.descricao || 'Frango Grelhado com Legumes',
+            imagem: req.body.cardapio2?.imagem || ''
+          }
+        }
+      );
+    }
+
     const novo = await Cardapio.create({
       data: inicio,
-      cardapio1: { descricao: req.body.cardapio1?.descricao || '', imagem: req.body.cardapio1?.imagem || '' },
-      cardapio2: { descricao: req.body.cardapio2?.descricao || '', imagem: req.body.cardapio2?.imagem || '' }
+      cardapios: cardapios
     });
 
     res.status(201).json({ mensagem: 'Cardápio salvo com sucesso!', cardapio: novo });
@@ -74,23 +109,51 @@ export const atualizarCardapioDeHoje = async (req, res) => {
       }
     };
 
+    // Processar cardápios dinâmicos
+    const cardapios = [];
+    if (req.body.cardapios && Array.isArray(req.body.cardapios)) {
+      req.body.cardapios.forEach((cardapio, index) => {
+        if (cardapio.item && cardapio.item.descricao) {
+          cardapios.push({
+            numero: cardapio.numero || (index + 1),
+            item: {
+              descricao: cardapio.item.descricao,
+              imagem: cardapio.item.imagem || ''
+            }
+          });
+        }
+      });
+    }
+    
+    // Se não houver cardápios válidos, usar dados antigos ou padrão
+    if (cardapios.length === 0) {
+      cardapios.push(
+        {
+          numero: 1,
+          item: {
+            descricao: req.body.cardapio1?.descricao || 'Feijoada Completa',
+            imagem: req.body.cardapio1?.imagem || ''
+          }
+        },
+        {
+          numero: 2,
+          item: {
+            descricao: req.body.cardapio2?.descricao || 'Frango Grelhado com Legumes',
+            imagem: req.body.cardapio2?.imagem || ''
+          }
+        }
+      );
+    }
+
     let doc = await Cardapio.findOne(filtroHojeExpr);
     if (doc) {
-      doc.cardapio1 = {
-        descricao: req.body.cardapio1?.descricao || '',
-        imagem: req.body.cardapio1?.imagem || ''
-      };
-      doc.cardapio2 = {
-        descricao: req.body.cardapio2?.descricao || '',
-        imagem: req.body.cardapio2?.imagem || ''
-      };
+      doc.cardapios = cardapios;
       await doc.save();
     } else {
       const hoje = new Date(); hoje.setHours(0,0,0,0);
       doc = await Cardapio.create({
         data: hoje,
-        cardapio1: { descricao: req.body.cardapio1?.descricao || '', imagem: req.body.cardapio1?.imagem || '' },
-        cardapio2: { descricao: req.body.cardapio2?.descricao || '', imagem: req.body.cardapio2?.imagem || '' }
+        cardapios: cardapios
       });
     }
 
@@ -129,6 +192,42 @@ export const obterCardapioPorId = async (req, res) => {
 // PUT /api/cardapios/:id
 export const atualizarCardapioPorId = async (req, res) => {
   try {
+    // Processar cardápios dinâmicos
+    const cardapios = [];
+    if (req.body.cardapios && Array.isArray(req.body.cardapios)) {
+      req.body.cardapios.forEach((cardapio, index) => {
+        if (cardapio.item && cardapio.item.descricao) {
+          cardapios.push({
+            numero: cardapio.numero || (index + 1),
+            item: {
+              descricao: cardapio.item.descricao,
+              imagem: cardapio.item.imagem || ''
+            }
+          });
+        }
+      });
+    }
+    
+    // Se não houver cardápios válidos, usar dados antigos ou padrão
+    if (cardapios.length === 0) {
+      cardapios.push(
+        {
+          numero: 1,
+          item: {
+            descricao: req.body.cardapio1?.descricao || 'Feijoada Completa',
+            imagem: req.body.cardapio1?.imagem || ''
+          }
+        },
+        {
+          numero: 2,
+          item: {
+            descricao: req.body.cardapio2?.descricao || 'Frango Grelhado com Legumes',
+            imagem: req.body.cardapio2?.imagem || ''
+          }
+        }
+      );
+    }
+
     const payload = {
       // Corrigir o processamento da data aqui também
       ...(req.body.data ? { 
@@ -139,8 +238,7 @@ export const atualizarCardapioPorId = async (req, res) => {
           return d; 
         })()
       } : {}),
-      cardapio1: { descricao: req.body.cardapio1?.descricao || '', imagem: req.body.cardapio1?.imagem || '' },
-      cardapio2: { descricao: req.body.cardapio2?.descricao || '', imagem: req.body.cardapio2?.imagem || '' }
+      cardapios: cardapios
     };
     const doc = await Cardapio.findByIdAndUpdate(req.params.id, payload, { new: true });
     if (!doc) return res.status(404).json({ erro: 'Não encontrado' });

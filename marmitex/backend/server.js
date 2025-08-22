@@ -178,13 +178,17 @@ async function mountApiRoutes() {
     }
 
     // Rota catch-all para APIs não encontradas
-    app.use('/api/*', (req, res) => {
-      res.status(404).json({ 
-        erro: 'Rota não encontrada', 
-        path: req.path,
-        method: req.method,
-        timestamp: new Date().toISOString()
-      });
+    app.use('/api', (req, res, next) => {
+      if (req.path.startsWith('/api/')) {
+        res.status(404).json({ 
+          erro: 'Rota não encontrada', 
+          path: req.path,
+          method: req.method,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        next();
+      }
     });
 
     console.log('🎯 Todas as rotas da API foram processadas');
@@ -312,12 +316,14 @@ async function start() {
       });
     });
 
-    // Inicia WhatsApp client COM o Socket.IO
-    await initWhatsApp(io);
-    
-    // Iniciar servidor
+    // Iniciar servidor ANTES do WhatsApp
     server.listen(PORT, () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    });
+    
+    // Inicia WhatsApp client COM o Socket.IO (não bloqueia o servidor)
+    initWhatsApp(io).catch(err => {
+      console.error('⚠️  WhatsApp falhou, mas servidor continua:', err.message);
     });
 
     // Encerramento gracioso

@@ -14,8 +14,10 @@ const itemSchema = new mongoose.Schema(
 
 const cardapioSchema = new mongoose.Schema({
   data: { type: Date, required: true },
-  cardapio1: itemSchema,
-  cardapio2: itemSchema
+  cardapios: [{
+    numero: { type: Number, required: true },
+    item: itemSchema
+  }]
 });
 
 export default mongoose.model('Cardapio', cardapioSchema);

@@ -12,6 +12,7 @@ const PedidoSchema = new mongoose.Schema(
     bebida: { type: String, enum: ['Coca Lata', 'Coca 1L', 'Coca 2L', 'Não'], required: true },
     formaPagamento: { type: String, enum: ['Dinheiro', 'PIX', 'Cartão'], required: true },
     total: { type: Number, required: true },
+    taxaEntrega: { type: Number, default: 0 },
     statusPagamento: { type: String, enum: ['pendente', 'pago', 'nao_aplicavel'], default: 'nao_aplicavel' },
     status: {
       type: String,
