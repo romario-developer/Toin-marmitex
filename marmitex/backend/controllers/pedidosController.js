@@ -80,20 +80,33 @@ async function notificarClienteStatus(pedido, novoStatus) {
     
     switch (novoStatus) {
       case 'pronto':
+        // Construir detalhes do pedido sem mostrar "Não" para bebida
+        let detalhes = `• ${pedido.cardapio.tipo} (${pedido.tamanho})`;
+        
+        // Só mostrar bebida se não for "Não"
+        if (pedido.bebida && pedido.bebida !== 'Não') {
+          detalhes += `\n• Bebida: ${pedido.bebida}`;
+        }
+        
+        // Mostrar taxa de entrega se for delivery
+        if (isDelivery && pedido.taxaEntrega > 0) {
+          const valorSemTaxa = pedido.total - pedido.taxaEntrega;
+          detalhes += `\n• Subtotal: R$ ${valorSemTaxa.toFixed(2).replace('.', ',')}`;
+          detalhes += `\n• Taxa de entrega: R$ ${pedido.taxaEntrega.toFixed(2).replace('.', ',')}`;
+        }
+        
+        detalhes += `\n• *Total: R$ ${pedido.total.toFixed(2).replace('.', ',')}*`;
+        
         if (isDelivery) {
           mensagem = `🚚 *Seu pedido está PRONTO para entrega!*\n\n` +
                     `📋 *Detalhes:*\n` +
-                    `• ${pedido.cardapio.tipo} (${pedido.tamanho})\n` +
-                    `• ${pedido.bebida}\n` +
-                    `• Total: R$ ${pedido.total.toFixed(2)}\n\n` +
+                    detalhes + `\n\n` +
                     `🛵 Nosso entregador já está a caminho!\n` +
                     `⏰ Tempo estimado: 15-25 minutos`;
         } else {
           mensagem = `🍽️ *Seu pedido está PRONTO para retirada!*\n\n` +
                     `📋 *Detalhes:*\n` +
-                    `• ${pedido.cardapio.tipo} (${pedido.tamanho})\n` +
-                    `• ${pedido.bebida}\n` +
-                    `• Total: R$ ${pedido.total.toFixed(2)}\n\n` +
+                    detalhes + `\n\n` +
                     `✅ Pode vir buscar quando quiser!\n` +
                     `📍 Estamos te esperando!`;
         }

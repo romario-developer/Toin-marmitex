@@ -40,11 +40,16 @@ const BOT_CONFIG = {
 
 /* ======================= CONFIGURAÇÕES DE ENCERRAMENTO ======================= */
 const MENSAGENS_ENCERRAMENTO = [
-  '✅ Atendimento encerrado! Foi um prazer atendê-lo(a). Volte sempre! 😊',
-  '🙏 Obrigado pela preferência! Atendimento finalizado. Até a próxima!',
-  '😄 Atendimento concluído! Esperamos você novamente em breve!',
-  '🤗 Muito obrigado! Atendimento encerrado. Tenha um ótimo dia!',
-  '✨ Atendimento finalizado! Obrigado pela confiança. Até logo!'
+  '✅ Foi um prazer atendê-lo(a)! Volte sempre! 😊',
+  '🙏 Obrigado pela preferência! Até a próxima!',
+  '😄 Esperamos você novamente em breve!',
+  '🤗 Muito obrigado! Tenha um ótimo dia!',
+  '✨ Obrigado pela confiança. Até logo!',
+  '😊 Que bom ter você aqui! Volte sempre!',
+  '🌟 Obrigado! Foi ótimo atendê-lo(a)!',
+  '💚 Muito obrigado pela preferência!',
+  '🎉 Até a próxima! Foi um prazer!',
+  '☺️ Obrigado! Esperamos você em breve!'
 ];
 
 const PALAVRAS_AGRADECIMENTO = [
@@ -52,11 +57,7 @@ const PALAVRAS_AGRADECIMENTO = [
   'muito obrigada', 'brigado', 'brigada', 'thanks', 'thank you'
 ];
 
-const PALAVRAS_REATIVAR_BOT = [
-  'cardapio', 'cardápio', 'marmita', 'marmitex', 'pedido', 'pedir',
-  'menu', 'comida', 'almoço', 'almoco', 'jantar', 'bot', 'automatico',
-  'voltar', 'retornar', 'ativar', 'reativar'
-];
+// Removido: PALAVRAS_REATIVAR_BOT - reativação apenas via opções 1 e 2
 
 /* =================== Configurações de Fluxo/Preços =================== */
 // Função para buscar preços das configurações do banco
@@ -304,8 +305,18 @@ async function encerrarAtendimentoPorAgradecimento(clientOrFn, telefone) {
   if (!sessao) return;
   
   try {
-    const mensagem = MENSAGENS_ENCERRAMENTO[Math.floor(Math.random() * MENSAGENS_ENCERRAMENTO.length)];
-    await enviar(clientOrFn, telefone, mensagem);
+    // Primeira mensagem: agradecimento variado
+    const mensagemEncerramento = MENSAGENS_ENCERRAMENTO[Math.floor(Math.random() * MENSAGENS_ENCERRAMENTO.length)];
+    await enviar(clientOrFn, telefone, mensagemEncerramento);
+    
+    // Segunda mensagem: opções de retorno (após um pequeno delay)
+    setTimeout(async () => {
+      const mensagemOpcoes = `💡 *Como posso ajudá-lo(a) novamente?*\n\n` +
+                            `1️⃣ Ver cardápio e fazer pedido\n` +
+                            `2️⃣ Falar com o proprietário\n\n` +
+                            `Digite *1* ou *2* para escolher:`;
+      await enviar(clientOrFn, telefone, mensagemOpcoes);
+    }, 2000);
     
     // Marcar sessão como encerrada
     sessao.estado = 'encerrado';
@@ -332,10 +343,7 @@ function verificarAgradecimento(texto) {
   return PALAVRAS_AGRADECIMENTO.some(palavra => textoNorm.includes(palavra));
 }
 
-function verificarPalavrasReativacao(texto) {
-  const textoNorm = normalizarTexto(texto);
-  return PALAVRAS_REATIVAR_BOT.some(palavra => textoNorm.includes(palavra));
-}
+// Removido: verificarPalavrasReativacao - reativação apenas via opções 1 e 2
 
 // Função para normalizar texto
 function normalizarTexto(texto) {
@@ -504,15 +512,37 @@ async function processarMensagem(clientOrFn, telefone, texto) {
 
     const sessao = SESSOES.get(telefone);
     
-    // Verificar se a sessão está encerrada ou em modo proprietário
+    // Verificar se a sessão está encerrada - permitir reativação
     if (sessao.estado === 'encerrado') {
-      console.log(`⚠️ Mensagem ignorada - sessão encerrada: ${telefone}`);
-      return;
+      const tNorm = normalizarTexto(texto);
+      // Permitir reativação com comandos específicos
+      if (tNorm === '1') {
+        resetSessao(telefone);
+        console.log(`🔄 Sessão reativada para ${telefone} via comando: "${texto}"`);
+        // Continuar processamento para mostrar cardápio
+      } else if (tNorm === '2') {
+        resetSessao(telefone);
+        // Ativar modo proprietário diretamente
+        sessao.estado = 'proprietario';
+        await enviar(clientOrFn, telefone, 
+          '👤 Você será conectado(a) com o proprietário em breve.\n\n' +
+          '⚠️ O atendimento automático foi desativado para esta conversa.\n' +
+          'Todas as suas mensagens serão encaminhadas diretamente ao proprietário.\n\n' +
+          '💡 *Para voltar ao atendimento automático*, digite:\n' +
+          '• "cardápio"'
+        );
+        console.log(`👤 Bot desativado para ${telefone} - modo proprietário ativado via opção 2`);
+        return;
+      } else {
+        console.log(`⚠️ Mensagem ignorada - sessão encerrada: ${telefone}`);
+        return;
+      }
     }
     
     if (sessao.estado === 'proprietario') {
-      // Verificar se cliente quer reativar o bot
-      if (verificarPalavrasReativacao(texto)) {
+      // Verificar se cliente quer reativar o bot com palavra-chave 'cardápio'
+      const textoNorm = normalizarTexto(texto);
+      if (textoNorm.includes('cardapio') || textoNorm.includes('cardápio')) {
         // Reativar o bot
         resetSessao(telefone);
         await enviar(clientOrFn, telefone, 
@@ -549,6 +579,13 @@ async function processarMensagem(clientOrFn, telefone, texto) {
       // Continuar para mostrar o menu inicial
     }
 
+    // Se o pedido foi finalizado e cliente quer fazer novo pedido
+    if (sessao.pedidoFinalizado && (tNorm === '1' || tNorm === 'cardapio' || tNorm === 'cardápio')) {
+      resetSessao(telefone);
+      await enviar(clientOrFn, telefone, '🔄 Iniciando novo pedido!');
+      // Continuar para mostrar o menu inicial
+    }
+
     // Detectar mensagens de agradecimento
     if (verificarAgradecimento(texto)) {
       await encerrarAtendimentoPorAgradecimento(clientOrFn, telefone);
@@ -576,10 +613,6 @@ Digite *1* ou *2* para escolher:`;
           // Verificar se é cliente recorrente
           sessao.clienteInfo = await verificarClienteRecorrente(telefone);
           
-          // Mensagem de boas-vindas personalizada
-          const mensagemBoasVindas = gerarMensagemBoasVindas(sessao.clienteInfo);
-          await enviar(clientOrFn, telefone, mensagemBoasVindas);
-          
           sessao.etapa = 'inicio';
           // Continuar para mostrar o cardápio
         } else if (tNorm === '2') {
@@ -589,10 +622,8 @@ Digite *1* ou *2* para escolher:`;
              '👤 Você será conectado(a) com o proprietário em breve.\n\n' +
              '⚠️ O atendimento automático foi desativado para esta conversa.\n' +
              'Todas as suas mensagens serão encaminhadas diretamente ao proprietário.\n\n' +
-             '💡 *Para voltar ao atendimento automático*, digite a qualquer momento:\n' +
-             '• "cardápio" ou "menu"\n' +
-             '• "marmita" ou "pedido"\n' +
-             '• "bot" ou "automático"'
+             '💡 *Para voltar ao atendimento automático*, digite:\n' +
+             '• "cardápio"'
            );
            console.log(`👤 Bot desativado para ${telefone} - modo proprietário ativado`);
            return;
@@ -691,9 +722,7 @@ Digite *1* ou *2* para escolher:`;
 
           // Buscar preços atualizados do banco
           const precos = await buscarPrecos();
-          const textoTamanho = `✅ *${sessao.dados.cardapio.tipo}* selecionado!
-
-Escolha o tamanho da marmita:
+          const textoTamanho = `Escolha o tamanho da marmita:
 
 1️⃣ Pequena (P) - R$ ${precos.P.toFixed(2).replace('.', ',')}
 2️⃣ Média (M) - R$ ${precos.M.toFixed(2).replace('.', ',')}
@@ -725,9 +754,7 @@ Escolha o tamanho da marmita:
           sessao.dados.preco = precos[tamanho];
           sessao.etapa = 'bebida';
 
-          const textoBebida = `✅ Tamanho *${tamanho}* selecionado!
-
-🥤 Deseja adicionar bebida?
+          const textoBebida = `🥤 Deseja adicionar bebida?
 
 1️⃣ Coca Lata - R$ ${precos.bebidas['Coca Lata'].toFixed(2).replace('.', ',')}
 2️⃣ Coca 1L - R$ ${precos.bebidas['Coca 1L'].toFixed(2).replace('.', ',')}
@@ -800,7 +827,7 @@ Escolha o tamanho da marmita:
           sessao.etapa = 'entrega';
           await enviar(clientOrFn, telefone, 
             `Como você prefere receber seu pedido?\n\n` +
-            `1️⃣ Delivery (entrega)\n` +
+            `1️⃣ Delivery (entrega) - R$ 3,00\n` +
             `2️⃣ Retirada no local`
           );
         }
@@ -827,11 +854,17 @@ Escolha o tamanho da marmita:
               sessao.dados.precoTotal += taxaEntrega;
               
               // Mostrar valor detalhado para delivery
-              const valorMarmita = sessao.dados.preco + sessao.dados.precoBebida;
+              let resumoItens = '';
+              if (sessao.dados.bebida === 'Não') {
+                resumoItens = `• Marmita: R$ ${sessao.dados.preco.toFixed(2).replace('.', ',')}`;
+              } else {
+                const valorMarmita = sessao.dados.preco + sessao.dados.precoBebida;
+                resumoItens = `• Marmita + Bebida: R$ ${valorMarmita.toFixed(2).replace('.', ',')}`;
+              }
+              
               await enviar(clientOrFn, telefone, 
-                `🚚 *Delivery selecionado!*\n\n` +
                 `💰 *Resumo do valor:*\n` +
-                `• Marmita + Bebida: R$ ${valorMarmita.toFixed(2).replace('.', ',')}\n` +
+                resumoItens + `\n` +
                 `• Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}\n` +
                 `• *Total: R$ ${sessao.dados.precoTotal.toFixed(2).replace('.', ',')}*`
               );
@@ -842,11 +875,17 @@ Escolha o tamanho da marmita:
               sessao.dados.taxaEntrega = taxaEntrega;
               sessao.dados.precoTotal += taxaEntrega;
               
-              const valorMarmita = sessao.dados.preco + sessao.dados.precoBebida;
+              let resumoItens = '';
+              if (sessao.dados.bebida === 'Não') {
+                resumoItens = `• Marmita: R$ ${sessao.dados.preco.toFixed(2).replace('.', ',')}`;
+              } else {
+                const valorMarmita = sessao.dados.preco + sessao.dados.precoBebida;
+                resumoItens = `• Marmita + Bebida: R$ ${valorMarmita.toFixed(2).replace('.', ',')}`;
+              }
+              
               await enviar(clientOrFn, telefone, 
-                `🚚 *Delivery selecionado!*\n\n` +
                 `💰 *Resumo do valor:*\n` +
-                `• Marmita + Bebida: R$ ${valorMarmita.toFixed(2).replace('.', ',')}\n` +
+                resumoItens + `\n` +
                 `• Taxa de entrega: R$ ${taxaEntrega.toFixed(2).replace('.', ',')}\n` +
                 `• *Total: R$ ${sessao.dados.precoTotal.toFixed(2).replace('.', ',')}*`
               );
