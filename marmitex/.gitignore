@@ -1,8 +1,13 @@
+# ========================================
+#           MarmiteX - .gitignore
+# ========================================
+
 # Dependencies
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+package-lock.json
 
 # Environment variables
 .env
@@ -32,20 +37,42 @@ coverage/
 build/
 dist/
 
-# WhatsApp tokens e QR codes (IMPORTANTE!)
-marmitex/backend/backend/qr/
-marmitex/backend/backend/wpp-tokens/
+# ========================================
+#        WhatsApp & WPPConnect
+# ========================================
+# Sessions do WhatsApp (contém dados sensíveis)
+backend/sessions/
+# QR codes e tokens
+backend/qr/
+backend/wpp-tokens/
 *.data.json
+# Arquivos de sessão
+*.session
+*.session.json
 
-# Uploads (opcional - se quiser versionar as imagens, remova esta linha)
-marmitex/backend/uploads/
+# ========================================
+#           Uploads & Media
+# ========================================
+# Uploads de imagens (opcional - remova se quiser versionar)
+backend/uploads/
+# Arquivos temporários
+temp/
+tmp/
 
-# IDE files
+# ========================================
+#              IDE & OS
+# ========================================
+# Visual Studio Code
 .vscode/
+# IntelliJ IDEA
 .idea/
+# Vim
 *.swp
 *.swo
 *~
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
 
 # OS generated files
 .DS_Store

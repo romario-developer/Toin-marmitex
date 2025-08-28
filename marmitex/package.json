@@ -1,6 +1,37 @@
 {
+  "name": "marmitex",
+  "version": "1.0.0",
+  "description": "Sistema completo para gestão de marmitarias com dashboard personalizado, integração WhatsApp e pagamentos via PIX",
+  "main": "backend/server.js",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm start",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start",
+    "setup": "npm run install:all && cd backend && cp .env.example .env"
+  },
+  "keywords": [
+    "marmitaria",
+    "delivery",
+    "whatsapp",
+    "pix",
+    "dashboard",
+    "nodejs",
+    "react"
+  ],
+  "author": "MarmiteX Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
   "dependencies": {
     "express": "^4.21.2",
     "mercadopago": "^2.8.0"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
   }
 }
