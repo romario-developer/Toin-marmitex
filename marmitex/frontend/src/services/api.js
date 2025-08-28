@@ -49,11 +49,17 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 401 -> /login
+// 401 -> /login e clearToken automático
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // Verificar se o backend solicitou limpeza do token
+    if (err?.response?.data?.clearToken) {
+      clearToken();
+    }
+    
     if (err?.response?.status === 401 && location.pathname !== '/login') {
+      clearToken(); // Limpar token em caso de 401
       location.replace('/login');
     }
     return Promise.reject(err);

@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { startClient, getClient, waitUntilReady } from './config/wppconnect.js';
+import multiTenantManager from './services/multiTenantWhatsappBot.js';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -160,6 +161,51 @@ async function mountApiRoutes() {
       console.error('❌ Erro ao carregar rotas de configurações:', err.message);
     }
 
+    // Importar e montar rotas de clientes
+    try {
+      const clienteRoutes = await import('./routes/clientes.js');
+      app.use('/api/clientes', clienteRoutes.default);
+      console.log('✅ Rotas de clientes montadas em /api/clientes');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de clientes:', err.message);
+    }
+
+    // Importar e montar rotas de configuração de clientes
+    try {
+      const clienteConfigRoutes = await import('./routes/clienteConfig.js');
+      app.use('/api/cliente-config', clienteConfigRoutes.default);
+      console.log('✅ Rotas de configuração de clientes montadas em /api/cliente-config');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de configuração de clientes:', err.message);
+    }
+
+    // Importar e montar rotas do WhatsApp para clientes
+    try {
+      const whatsappRoutes = await import('./routes/whatsapp.js');
+      app.use('/api/whatsapp', whatsappRoutes.default);
+      console.log('✅ Rotas do WhatsApp montadas em /api/whatsapp');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas do WhatsApp:', err.message);
+    }
+
+    // Importar e montar rotas do PIX para clientes
+    try {
+      const pixRoutes = await import('./routes/pix.js');
+      app.use('/api/pix', pixRoutes.default);
+      console.log('✅ Rotas do PIX montadas em /api/pix');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas do PIX:', err.message);
+    }
+
+    // Importar e montar rotas do Dashboard
+    try {
+      const dashboardRoutes = await import('./routes/dashboard.js');
+      app.use('/api/dashboard', dashboardRoutes.default);
+      console.log('✅ Rotas do Dashboard montadas em /api/dashboard');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas do Dashboard:', err.message);
+    }
+
     // Importar e montar outras rotas se existirem
     const optionalRoutes = [
       { file: './routes/index.js', path: '/api' },
@@ -217,58 +263,18 @@ async function connectMongo() {
 /* =========================
    WhatsApp (WPPConnect)
 ========================= */
-async function initWhatsApp(io) {
+async function initMultiTenantWhatsApp(io) {
   try {
-    console.log('🤖 Inicializando WhatsApp...');
+    console.log('🤖 Inicializando gerenciador multi-tenant WhatsApp...');
     
-    const clientPromise = await startClient('marmitex-bot', {
-      headless: true,
-      autoClose: 0,
-      logQR: true,
-      debug: false,
-    });
-
-    const client = await clientPromise;
-    console.log('✅ WPPConnect criado. Aguardando login...');
-
-    const ready = await waitUntilReady(client);
-    if (!ready) {
-      console.log(`ℹ️  Ainda não logado. Abra http://localhost:${PORT}/qr/view para escanear o QR.`);
-    } else {
-      console.log('🎉 WhatsApp logado e pronto!');
-    }
-
-    await mountWhatsAppBot(client, io);
+    // Configurar Socket.IO no gerenciador
+    multiTenantManager.setSocketIO(io);
+    
+    console.log('✅ Gerenciador multi-tenant WhatsApp inicializado!');
+    console.log('ℹ️  As instâncias serão criadas quando os clientes se conectarem.');
+    
   } catch (err) {
-    console.error('❌ Erro ao iniciar WhatsApp:', err.message);
-  }
-}
-
-async function mountWhatsAppBot(client, io) {
-  const botPath = path.resolve(__dirname, './services/whatsappBot.js');
-  if (!fs.existsSync(botPath)) {
-    console.warn('⚠️  services/whatsappBot.js não encontrado — seguindo sem fluxo do bot.');
-    return;
-  }
-  
-  try {
-    const mod = await import(pathToFileURL(botPath).href);
-
-    if (typeof mod?.default === 'function') {
-      await mod.default(client, io); // ✅ Passar io
-      console.log('🤖 whatsappBot (default) inicializado.');
-      return;
-    }
-    
-    if (typeof mod?.initBot === 'function') {
-      await mod.initBot(client, io); // ✅ Passar io
-      console.log('🤖 whatsappBot (initBot) inicializado.');
-      return;
-    }
-    
-    console.log('ℹ️  whatsappBot.js não exporta init; assumindo registro por side-effect.');
-  } catch (e) {
-    console.error('❌ Falha ao carregar services/whatsappBot.js:', e.message);
+    console.error('❌ Erro ao iniciar gerenciador multi-tenant:', err.message);
   }
 }
 
@@ -321,15 +327,19 @@ async function start() {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
     });
     
-    // Inicia WhatsApp client COM o Socket.IO (não bloqueia o servidor)
-    initWhatsApp(io).catch(err => {
-      console.error('⚠️  WhatsApp falhou, mas servidor continua:', err.message);
+    // Inicia gerenciador multi-tenant WhatsApp COM o Socket.IO (não bloqueia o servidor)
+    initMultiTenantWhatsApp(io).catch(err => {
+      console.error('⚠️  Gerenciador multi-tenant falhou, mas servidor continua:', err.message);
     });
 
     // Encerramento gracioso
     const shutdown = async (signal) => {
       try {
         console.log(`\n${signal} recebido. Encerrando...`);
+        
+        // Para todas as instâncias WhatsApp
+        await multiTenantManager.stopAllInstances();
+        console.log('🛑 Instâncias WhatsApp paradas.');
         
         // Fecha HTTP
         await new Promise((resolve) => server.close(resolve));

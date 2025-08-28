@@ -1,6 +1,13 @@
 import mongoose from 'mongoose';
 
 const configuracaoSchema = new mongoose.Schema({
+  clienteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    required: true,
+    unique: true,
+    index: true
+  },
   precosMarmita: {
     P: Number,
     M: Number,
@@ -80,6 +87,11 @@ const configuracaoSchema = new mongoose.Schema({
       max: 10000
     }
   }
+}, {
+  timestamps: true
 });
+
+// Índice para isolamento de dados
+configuracaoSchema.index({ clienteId: 1 });
 
 export default mongoose.model('Configuracao', configuracaoSchema);

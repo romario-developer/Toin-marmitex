@@ -13,11 +13,22 @@ const itemSchema = new mongoose.Schema(
 );
 
 const cardapioSchema = new mongoose.Schema({
+  clienteId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Cliente',
+    required: true,
+    index: true
+  },
   data: { type: Date, required: true },
   cardapios: [{
     numero: { type: Number, required: true },
     item: itemSchema
   }]
+}, {
+  timestamps: true
 });
+
+// Índice composto para performance e isolamento
+cardapioSchema.index({ clienteId: 1, data: 1 });
 
 export default mongoose.model('Cardapio', cardapioSchema);

@@ -3,6 +3,12 @@ import mongoose from 'mongoose';
 
 const PedidoSchema = new mongoose.Schema(
   {
+    clienteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Cliente',
+      required: true,
+      index: true
+    },
     telefone: { type: String, required: true, index: true },
     cardapio: {
       tipo: { type: String, enum: ['CARDÁPIO 1', 'CARDÁPIO 2'], required: true },
@@ -37,5 +43,10 @@ const PedidoSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+// Índices compostos para performance e isolamento
+PedidoSchema.index({ clienteId: 1, telefone: 1 });
+PedidoSchema.index({ clienteId: 1, status: 1 });
+PedidoSchema.index({ clienteId: 1, createdAt: -1 });
 
 export default mongoose.model('Pedido', PedidoSchema);

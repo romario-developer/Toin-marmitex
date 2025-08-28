@@ -4,12 +4,12 @@ import NotificationCenter from './NotificationCenter';
 
 export default function NavBar() {
   const navigate = useNavigate();
-  const email = localStorage.getItem('adm_email') || '';
+  const email = localStorage.getItem('email') || '';
   const [open, setOpen] = useState(false);
 
   function sair() {
-    localStorage.removeItem('adm_token');
-    localStorage.removeItem('adm_email');
+    localStorage.removeItem('token');
+    localStorage.removeItem('email');
     navigate('/login', { replace: true });
   }
 
@@ -21,7 +21,7 @@ export default function NavBar() {
   return (
     <header className="bg-gray-100 p-3 sm:p-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-lg sm:text-2xl font-bold">Painel Admin</h1>
+        <h1 className="text-lg sm:text-2xl font-bold">Marmitex</h1>
 
         {/* Desktop actions */}
         <div className="hidden sm:flex gap-2 items-center">
@@ -47,19 +47,19 @@ export default function NavBar() {
 
       {/* Nav desktop */}
       <nav className="hidden sm:flex flex-wrap gap-2 mt-3">
+        <NavLink to="/dashboard" className={linkCls}>Dashboard</NavLink>
         <NavLink to="/cardapio" className={linkCls}>Cadastro de Cardápio</NavLink>
         <NavLink to="/pedidos" className={linkCls}>Pedidos</NavLink>
-        <NavLink to="/config" className={linkCls}>Configurações</NavLink>
-        {/* Remover esta linha: <NavLink to="/simulador" className={linkCls}>Simulador</NavLink> */}
+        <NavLink to="/configuracoes" className={linkCls}>Configurações</NavLink>
       </nav>
 
       {/* Nav mobile dropdown */}
       {open && (
         <div className="sm:hidden mt-3 rounded border bg-white p-2 space-y-2">
+          <NavLink to="/dashboard" className={linkCls} onClick={() => setOpen(false)}>Dashboard</NavLink>
           <NavLink to="/cardapio" className={linkCls} onClick={() => setOpen(false)}>Cadastro de Cardápio</NavLink>
           <NavLink to="/pedidos" className={linkCls} onClick={() => setOpen(false)}>Pedidos</NavLink>
-          <NavLink to="/config" className={linkCls} onClick={() => setOpen(false)}>Configurações</NavLink>
-          {/* Remover esta linha: <NavLink to="/simulador" className={linkCls} onClick={() => setOpen(false)}>Simulador</NavLink> */}
+          <NavLink to="/configuracoes" className={linkCls} onClick={() => setOpen(false)}>Configurações</NavLink>
 
           <div className="flex items-center justify-between pt-2 border-t">
             <div className="flex items-center gap-2">
@@ -77,13 +77,5 @@ export default function NavBar() {
       )}
     </header>
   );
-  return (
-    <nav className="bg-white shadow-sm border-b">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <NotificationCenter />
-        </div>
-      </div>
-    </nav>
-  );
+
 }

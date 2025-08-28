@@ -1,4 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import Landing from './pages/Landing';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
 import CadastroCardapio from './pages/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
 import Configuracoes from './pages/Configuracoes';
@@ -11,9 +14,22 @@ export default function App() {
     <div className="min-h-screen bg-gray-100">
       <Routes>
         {/* público */}
-        <Route path="/login" element={<Login onSuccess={() => window.location.replace('/cardapio')} />} />
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login onSuccess={() => window.location.replace('/dashboard')} />} />
+        <Route path="/register" element={<Register />} />
 
         {/* protegidos */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <Dashboard />
+              </main>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/cardapio"
           element={
@@ -37,7 +53,7 @@ export default function App() {
           }
         />
         <Route
-          path="/config"
+          path="/configuracoes"
           element={
             <ProtectedRoute>
               <NavBar />
@@ -49,8 +65,8 @@ export default function App() {
         />
 
         {/* redirects */}
-        <Route path="/" element={<Navigate to="/cardapio" replace />} />
-        <Route path="*" element={<Navigate to="/cardapio" replace />} />
+        <Route path="/app" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
