@@ -3,12 +3,15 @@ import wppconnect from '@wppconnect-team/wppconnect';
 import path from 'node:path';
 import fs from 'node:fs';
 import qrcodeTerminal from 'qrcode-terminal';
+import { fileURLToPath } from 'node:url';
 
 const clients = new Map();
 
-const ROOT = process.cwd();
-const TOKENS_DIR = path.resolve(ROOT, 'backend', 'wpp-tokens');
-const QR_DIR = path.resolve(ROOT, 'backend', 'qr');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const BACKEND_ROOT = path.resolve(__dirname, '..');
+const TOKENS_DIR = path.resolve(BACKEND_ROOT, 'wpp-tokens');
+const QR_DIR = path.resolve(BACKEND_ROOT, 'qr');
 
 // Garante pastas
 for (const dir of [TOKENS_DIR, QR_DIR]) {
@@ -170,7 +173,6 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
 
   const {
     headless = true,
-    autoClose = 60000, // 1 minuto ao invés de 0
     logQR = true,
     debug = false,
   } = options;
@@ -179,7 +181,6 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
     .create({
       session: sessionId,
       headless,
-      autoClose, // Permite auto-close para limpeza
       logQR: true,
       debug,
       folderNameToken: TOKENS_DIR,
@@ -213,7 +214,9 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
       disableWelcome: true,
       updatesLog: false,
       // Timeout para QR Code mais generoso
-      timeout: 120000, // 2 minutos
+      timeout: 300000, // 5 minutos
+      autoClose: 300000, // 5 minutos para auto close
+      logQR: false, // Desabilitar log QR no console para evitar spam
       // Configurações de QR Code otimizadas
       catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
         console.log(`📱 QR Code gerado - Tentativa ${attempts || 1}`);
@@ -225,7 +228,27 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
         }
         
         // Salva QR como imagem com tratamento de erro melhorado
-        const qrPath = path.join(QR_DIR, `qr-${sessionId}.png`);
+        const qrPath = path.join(QR_DIR, `qr-cliente_${sessionId}.png`);
+        
+        // Verificar se já existe um QR válido (evitar substituir durante múltiplas tentativas)
+        if (fs.existsSync(qrPath)) {
+          try {
+            const stats = fs.statSync(qrPath);
+            const fileAge = Date.now() - stats.mtime.getTime();
+            
+            // Se o arquivo tem menos de 30 segundos e não está vazio, não substituir
+            if (fileAge < 30000 && stats.size > 1000) {
+              console.log(`🔄 QR existente ainda válido (${Math.round(fileAge/1000)}s) - mantendo arquivo atual`);
+              console.log(`💡 Abra no navegador: http://localhost:5000/qr/view`);
+              return;
+            } else {
+              console.log(`🔄 QR existente expirado (${Math.round(fileAge/1000)}s) ou muito pequeno (${stats.size}b) - gerando novo`);
+            }
+          } catch (statError) {
+            console.log('⚠️ Erro ao verificar QR existente:', statError.message);
+          }
+        }
+        
         let base64Data;
         
         try {
@@ -246,8 +269,8 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
           fs.writeFileSync(qrPath, base64Data, 'base64');
           console.log(`🖼️ QR salvo em: ${qrPath}`);
           console.log(`💡 Abra no navegador: http://localhost:5000/qr/view`);
-          console.log(`⏰ QR Code expira em 20 segundos - Escaneie rapidamente!`);
-          console.log(`🔄 Tentativa ${attempts || 1} - Se não funcionar, será gerado um novo QR`);
+          console.log(`⏰ QR Code válido por 30 segundos - Escaneie rapidamente!`);
+          console.log(`🔄 Tentativa ${attempts || 1} - Arquivo protegido contra substituição por 30s`);
           
         } catch (err) {
           console.error('❌ Erro ao salvar QR:', err.message);
@@ -310,7 +333,7 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
       clients.delete(sessionId);
       
       // Se for erro de QR, tenta novamente com configurações mais simples
-      if (err.message.includes('QRCode') || err.message.includes('Failed to read')) {
+      if (err.message && (err.message.includes('QRCode') || err.message.includes('Failed to read'))) {
         console.log('🔄 Tentando novamente com configurações simplificadas...');
         // Não relança o erro imediatamente, deixa o sistema tentar novamente
       }
@@ -359,5 +382,81 @@ export async function waitUntilReady(client, timeoutMs = 120_000) {
   }
   
   throw new Error('Timeout: Cliente não ficou pronto a tempo');
+}
+
+// Função para limpar sessões antigas e cache
+export async function cleanupOldSessions(sessionId = 'marmitex-bot', forceClean = false) {
+  console.log('🧹 Iniciando limpeza de sessões antigas...');
+  
+  try {
+    // 1. Fechar cliente existente se houver
+    if (clients.has(sessionId)) {
+      console.log('🔄 Fechando cliente existente...');
+      try {
+        const client = await clients.get(sessionId);
+        if (client && typeof client.close === 'function') {
+          await client.close();
+        }
+      } catch (err) {
+        console.log('⚠️ Erro ao fechar cliente:', err.message);
+      }
+      clients.delete(sessionId);
+    }
+    
+    // 2. Limpar tokens salvos
+    const tokenPath = path.join(TOKENS_DIR, sessionId);
+    if (fs.existsSync(tokenPath)) {
+      console.log('🗑️ Removendo tokens salvos...');
+      fs.rmSync(tokenPath, { recursive: true, force: true });
+    }
+    
+    // 3. Limpar QR codes antigos
+    const qrFiles = fs.readdirSync(QR_DIR).filter(file => 
+      file.includes(sessionId) || file === 'qr.png'
+    );
+    
+    for (const file of qrFiles) {
+      const filePath = path.join(QR_DIR, file);
+      try {
+        fs.unlinkSync(filePath);
+        console.log(`🗑️ QR removido: ${file}`);
+      } catch (err) {
+        console.log(`⚠️ Erro ao remover QR ${file}:`, err.message);
+      }
+    }
+    
+    // 4. Aguardar um pouco para garantir limpeza completa
+    await delay(2000);
+    
+    console.log('✅ Limpeza de sessões concluída');
+    return true;
+    
+  } catch (err) {
+    console.error('❌ Erro durante limpeza de sessões:', err.message);
+    return false;
+  }
+}
+
+// Função para forçar nova conexão limpa
+export async function forceCleanConnection(sessionId = 'marmitex-bot') {
+  console.log('🔄 Forçando nova conexão limpa...');
+  
+  try {
+    // Limpar tudo primeiro
+    await cleanupOldSessions(sessionId, true);
+    
+    // Aguardar um pouco mais para garantir limpeza
+    await delay(3000);
+    
+    // Iniciar nova conexão
+    console.log('🚀 Iniciando nova conexão...');
+    const client = await initWpp(sessionId, { autoReconnect: false });
+    
+    return client;
+    
+  } catch (err) {
+    console.error('❌ Erro ao forçar nova conexão:', err.message);
+    throw err;
+  }
 }
 

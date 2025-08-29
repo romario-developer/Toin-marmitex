@@ -38,38 +38,74 @@ app.set('trust proxy', 1);
 
 // Middlewares
 app.use(cors({
-  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3000'],
   credentials: true,
 }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 
-// Servir arquivos do QR
-app.use('/qr', express.static(QR_DIR));
-
-// Adicionar esta linha para servir as imagens dos cardápios
-app.use('/uploads', express.static(path.resolve('uploads')));
-
-app.get('/', (_req, res) => {
-  res.json({ message: 'API Marmitex funcionando!', timestamp: new Date().toISOString() });
-});
-
-app.get('/healthz', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// Rota para visualizar QR no navegador
+// Rota para visualizar QR no navegador (deve vir ANTES do middleware estático)
 app.get('/qr/view', (_req, res) => {
-  const qrPath = path.join(QR_DIR, 'qr.png');
-  
-  // Verificar se o arquivo existe e não está vazio
-  if (fs.existsSync(qrPath)) {
-    const stats = fs.statSync(qrPath);
-    if (stats.size > 0) {
-      res.sendFile(qrPath);
-      return;
+  try {
+    console.log('🔍 Procurando QR codes em:', QR_DIR);
+    
+    // Verificar se o diretório existe
+    if (!fs.existsSync(QR_DIR)) {
+      console.log('❌ Diretório QR não existe:', QR_DIR);
+      throw new Error('Diretório QR não encontrado');
     }
+    
+    // Procurar por qualquer arquivo QR na pasta
+    const allFiles = fs.readdirSync(QR_DIR);
+    console.log('📁 Todos os arquivos no diretório:', allFiles);
+    
+    // Priorizar QR codes específicos de clientes (formato: qr_clienteId.png)
+    const clienteQrFiles = allFiles.filter(file => file.startsWith('qr_') && file.endsWith('.png'));
+    const genericQrFiles = allFiles.filter(file => file.startsWith('qr-') && file.endsWith('.png'));
+    
+    console.log('🖼️ QR codes de clientes encontrados:', clienteQrFiles);
+    console.log('🖼️ QR codes genéricos encontrados:', genericQrFiles);
+    
+    // Primeiro tentar servir QR de cliente específico (mais recente)
+    if (clienteQrFiles.length > 0) {
+      // Ordenar por data de modificação (mais recente primeiro)
+      const sortedClienteFiles = clienteQrFiles
+        .map(file => ({
+          name: file,
+          path: path.join(QR_DIR, file),
+          mtime: fs.statSync(path.join(QR_DIR, file)).mtime
+        }))
+        .sort((a, b) => b.mtime - a.mtime);
+      
+      for (const fileInfo of sortedClienteFiles) {
+        const stats = fs.statSync(fileInfo.path);
+        console.log(`📄 Verificando QR cliente: ${fileInfo.name} (${stats.size} bytes, ${Math.round((Date.now() - fileInfo.mtime.getTime())/1000)}s atrás)`);
+        
+        if (stats.size > 1000) { // QR válido deve ter pelo menos 1KB
+          console.log('✅ Servindo QR code de cliente:', fileInfo.path);
+          res.sendFile(fileInfo.path);
+          return;
+        }
+      }
+    }
+    
+    // Se não há QR de cliente válido, tentar QR genérico
+    if (genericQrFiles.length > 0) {
+      const qrPath = path.join(QR_DIR, genericQrFiles[genericQrFiles.length - 1]);
+      console.log('📄 Tentando servir QR genérico:', qrPath);
+      
+      const stats = fs.statSync(qrPath);
+      console.log('📊 Tamanho do arquivo:', stats.size, 'bytes');
+      
+      if (stats.size > 1000) {
+        console.log('✅ Servindo QR code genérico:', qrPath);
+        res.sendFile(qrPath);
+        return;
+      }
+    }
+  } catch (error) {
+    console.error('❌ Erro ao buscar QR code:', error);
   }
   
   // Se não existe ou está vazio, mostrar página de aguardo
@@ -116,6 +152,20 @@ app.get('/qr/view', (_req, res) => {
     </body>
     </html>
   `);
+});
+
+// Servir arquivos do QR
+app.use('/qr', express.static(QR_DIR));
+
+// Adicionar esta linha para servir as imagens dos cardápios
+app.use('/uploads', express.static(path.resolve('uploads')));
+
+app.get('/', (_req, res) => {
+  res.json({ message: 'API Marmitex funcionando!', timestamp: new Date().toISOString() });
+});
+
+app.get('/healthz', (_req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 /* =========================

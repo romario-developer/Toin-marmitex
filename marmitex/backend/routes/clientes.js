@@ -2,6 +2,7 @@ import express from 'express';
 import * as clienteAuthController from '../controllers/clienteAuthController.js';
 import * as clienteController from '../controllers/clienteController.js';
 import { authenticateCliente, addClienteFilter } from '../middleware/clienteAuth.js';
+import { iniciarConexaoWhatsApp, getQRCodeImage, desconectarWhatsApp } from '../controllers/whatsappController.js';
 
 const router = express.Router();
 
@@ -24,8 +25,12 @@ router.put('/perfil', clienteAuthController.atualizarPerfil);
 
 // Configurações do WhatsApp
 router.get('/whatsapp/status', clienteController.getWhatsAppStatus);
+router.get('/whatsapp/qr-code', getQRCodeImage);
+router.post('/whatsapp/conectar', iniciarConexaoWhatsApp);
+router.post('/whatsapp/desconectar', desconectarWhatsApp);
 
-router.post('/whatsapp/conectar', async (req, res) => {
+// Manter rota antiga para compatibilidade
+router.post('/whatsapp/conectar-old', async (req, res) => {
   try {
     const { default: Cliente } = await import('../models/Cliente.js');
     

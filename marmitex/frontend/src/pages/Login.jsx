@@ -36,8 +36,11 @@ const Login = () => {
       
       // Salvar token e dados do usuário
       localStorage.setItem('token', data.token);
+      localStorage.setItem('adm_token', data.token); // Para ProtectedRoute
       localStorage.setItem('email', data.cliente.email);
       localStorage.setItem('clienteId', data.cliente.id);
+      
+      console.log('Login bem-sucedido:', data);
       
       // Redirecionar para o dashboard
       navigate('/dashboard', { replace: true });

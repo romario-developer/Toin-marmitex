@@ -97,7 +97,7 @@ export const updateMe = async (req, res) => {
 // Obter status da conexão WhatsApp do cliente
 export const getWhatsAppStatus = async (req, res) => {
   try {
-    const { clienteId } = req.cliente;
+    const clienteId = req.clienteId;
     
     const cliente = await Cliente.findById(clienteId).select('whatsapp');
     

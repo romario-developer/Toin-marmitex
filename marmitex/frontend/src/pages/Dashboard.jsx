@@ -224,7 +224,7 @@ const Dashboard = () => {
                   Gerenciar Cardápio
                 </Button>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Button
                   component={Link}
                   to="/pedidos"
@@ -236,7 +236,7 @@ const Dashboard = () => {
                   Ver Pedidos
                 </Button>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Button
                   component={Link}
                   to="/configuracoes"
@@ -248,7 +248,7 @@ const Dashboard = () => {
                   Configurações
                 </Button>
               </Grid>
-              <Grid item xs={12} sm={6}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Button
                   variant="contained"
                   fullWidth
@@ -267,7 +267,7 @@ const Dashboard = () => {
           </Paper>
         </Grid>
 
-        <Grid item xs={12} md={6}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <Paper sx={{ p: 3 }}>
             <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
               <TrendingUp sx={{ mr: 1, color: '#FF6B35' }} />

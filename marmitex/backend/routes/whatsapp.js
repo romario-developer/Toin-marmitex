@@ -5,7 +5,9 @@ import {
   desconectarWhatsApp,
   atualizarConfigWhatsApp,
   getQRCodeImage,
-  listarInstanciasAtivas
+  listarInstanciasAtivas,
+  limparSessoesAntigas,
+  forcarNovaConexao
 } from '../controllers/whatsappController.js';
 import { authenticateCliente } from '../middleware/clienteAuth.js';
 
@@ -20,6 +22,10 @@ router.get('/status', getStatusWhatsApp);
 router.post('/desconectar', desconectarWhatsApp);
 router.put('/config', atualizarConfigWhatsApp);
 router.get('/qr-code', getQRCodeImage);
+
+// Rotas para limpeza e reconexão
+router.post('/limpar-sessoes', limparSessoesAntigas);
+router.post('/forcar-nova-conexao', forcarNovaConexao);
 
 // Rota para debug/admin - listar instâncias ativas
 router.get('/instancias', listarInstanciasAtivas);

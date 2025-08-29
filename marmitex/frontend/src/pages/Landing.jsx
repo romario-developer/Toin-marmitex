@@ -248,7 +248,7 @@ const Landing = () => {
                 ))}
               </List>
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Box sx={{ textAlign: 'center' }}>
                 <img 
                   src="/api/placeholder/400/300" 
@@ -378,7 +378,7 @@ const Landing = () => {
                     required
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Email"
@@ -389,7 +389,7 @@ const Landing = () => {
                     required
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Telefone/WhatsApp"
@@ -399,7 +399,7 @@ const Landing = () => {
                     required
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <TextField
                     fullWidth
                     label="Nome do Estabelecimento"
@@ -443,7 +443,7 @@ const Landing = () => {
                 <Phone sx={{ color: '#2196F3' }} />
               </Box>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
                 Recursos
               </Typography>
@@ -462,7 +462,7 @@ const Landing = () => {
                 </ListItem>
               </List>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid size={{ xs: 12, md: 4 }}>
               <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>
                 Suporte
               </Typography>

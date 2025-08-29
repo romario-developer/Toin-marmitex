@@ -4,7 +4,7 @@ import Cliente from '../models/Cliente.js';
 // Obter estatísticas do dashboard para o cliente
 export const getDashboardStats = async (req, res) => {
   try {
-    const { clienteId } = req.cliente;
+    const clienteId = req.clienteId;
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const amanha = new Date(hoje);

@@ -7,8 +7,8 @@ import NumeroPermitido from '../models/NumeroPermitido.js';
 import { criarPagamentoPIX } from './mercadoPagoService.js';
 import fetch from 'node-fetch';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -63,6 +63,26 @@ class MultiTenantWhatsAppManager {
       const callbacks = {
         onQRCode: async (qrCode) => {
           console.log(`📱 QR Code gerado para cliente ${clienteId}`);
+          
+          // Salvar QR code como arquivo de imagem
+          try {
+            const qrDir = path.resolve(process.cwd(), 'backend', 'qr');
+            const qrPath = path.join(qrDir, `qr-cliente_${clienteId}.png`);
+            
+            // Garantir que o diretório existe
+            if (!fs.existsSync(qrDir)) {
+              fs.mkdirSync(qrDir, { recursive: true });
+            }
+            
+            // Remover prefixo data URL se presente
+            const base64Data = qrCode.replace(/^data:image\/[a-z]+;base64,/, '');
+            
+            // Salvar arquivo
+            fs.writeFileSync(qrPath, base64Data, 'base64');
+            console.log(`🖼️ QR Code salvo em: ${qrPath}`);
+          } catch (error) {
+            console.error('❌ Erro ao salvar QR Code:', error);
+          }
           
           await Cliente.findByIdAndUpdate(clienteId, {
             'whatsapp.qrCode': qrCode,
