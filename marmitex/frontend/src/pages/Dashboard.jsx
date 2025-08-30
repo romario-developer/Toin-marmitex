@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
+import PlanoInfo from '../components/PlanoInfo';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -100,7 +101,7 @@ const Dashboard = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
         <LinearProgress />
         <Typography variant="h6" sx={{ mt: 2, textAlign: 'center' }}>
           Carregando dashboard...
@@ -110,13 +111,13 @@ const Dashboard = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2, md: 4 }, px: { xs: 2, md: 3 } }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+      <Box sx={{ mb: { xs: 3, md: 4 } }}>
+        <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
           Olá, {cliente?.nome || 'Cliente'}! 👋
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
           {cliente?.nomeEstabelecimento || 'Seu Estabelecimento'}
         </Typography>
       </Box>
@@ -142,15 +143,15 @@ const Dashboard = () => {
       )}
 
       {/* Cards de Estatísticas */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={{ xs: 2, md: 3 }} sx={{ mb: { xs: 3, md: 4 } }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <ShoppingCart sx={{ color: '#FF6B35', mr: 1 }} />
-                <Typography variant="h6">Pedidos Hoje</Typography>
+                <ShoppingCart sx={{ color: '#FF6B35', mr: 1, fontSize: { xs: 20, md: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Pedidos Hoje</Typography>
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#FF6B35' }}>
+              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#FF6B35', fontSize: { xs: '2rem', md: '3rem' } }}>
                 {stats.pedidosHoje}
               </Typography>
             </CardContent>
@@ -161,10 +162,10 @@ const Dashboard = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <AttachMoney sx={{ color: '#4CAF50', mr: 1 }} />
-                <Typography variant="h6">Vendas Hoje</Typography>
+                <AttachMoney sx={{ color: '#4CAF50', mr: 1, fontSize: { xs: 20, md: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Vendas Hoje</Typography>
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#4CAF50' }}>
+              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#4CAF50', fontSize: { xs: '2rem', md: '3rem' } }}>
                 R$ {stats.vendasHoje?.toFixed(2) || '0.00'}
               </Typography>
             </CardContent>
@@ -175,10 +176,10 @@ const Dashboard = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <People sx={{ color: '#2196F3', mr: 1 }} />
-                <Typography variant="h6">Clientes Ativos</Typography>
+                <People sx={{ color: '#2196F3', mr: 1, fontSize: { xs: 20, md: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Clientes Ativos</Typography>
               </Box>
-              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#2196F3' }}>
+              <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#2196F3', fontSize: { xs: '2rem', md: '3rem' } }}>
                 {stats.clientesAtivos}
               </Typography>
             </CardContent>
@@ -189,8 +190,8 @@ const Dashboard = () => {
           <Card>
             <CardContent>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <WhatsApp sx={{ color: '#25D366', mr: 1 }} />
-                <Typography variant="h6">WhatsApp</Typography>
+                <WhatsApp sx={{ color: '#25D366', mr: 1, fontSize: { xs: 20, md: 24 } }} />
+                <Typography variant="h6" sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>WhatsApp</Typography>
               </Box>
               <Chip 
                 label={getWhatsAppStatusText(stats.whatsappStatus)}
@@ -202,16 +203,21 @@ const Dashboard = () => {
         </Grid>
       </Grid>
 
+      {/* Informações do Plano */}
+      <Box sx={{ mb: { xs: 3, md: 4 } }}>
+        <PlanoInfo />
+      </Box>
+
       {/* Ações Rápidas */}
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, md: 3 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-              <Restaurant sx={{ mr: 1, color: '#FF6B35' }} />
+          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+            <Typography variant="h6" sx={{ mb: { xs: 2, md: 3 }, display: 'flex', alignItems: 'center', fontSize: { xs: '1rem', md: '1.25rem' } }}>
+              <Restaurant sx={{ mr: 1, color: '#FF6B35', fontSize: { xs: 20, md: 24 } }} />
               Ações Rápidas
             </Typography>
             
-            <Grid container spacing={2}>
+            <Grid container spacing={{ xs: 1, md: 2 }}>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <Button
                   component={Link}
@@ -219,7 +225,7 @@ const Dashboard = () => {
                   variant="outlined"
                   fullWidth
                   startIcon={<Restaurant />}
-                  sx={{ py: 1.5 }}
+                  sx={{ py: { xs: 1, md: 1.5 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                 >
                   Gerenciar Cardápio
                 </Button>
@@ -231,7 +237,7 @@ const Dashboard = () => {
                   variant="outlined"
                   fullWidth
                   startIcon={<ShoppingCart />}
-                  sx={{ py: 1.5 }}
+                  sx={{ py: { xs: 1, md: 1.5 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                 >
                   Ver Pedidos
                 </Button>
@@ -243,7 +249,7 @@ const Dashboard = () => {
                   variant="outlined"
                   fullWidth
                   startIcon={<Settings />}
-                  sx={{ py: 1.5 }}
+                  sx={{ py: { xs: 1, md: 1.5 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }}
                 >
                   Configurações
                 </Button>
@@ -254,7 +260,8 @@ const Dashboard = () => {
                   fullWidth
                   startIcon={<WhatsApp />}
                   sx={{ 
-                    py: 1.5,
+                    py: { xs: 1, md: 1.5 },
+                    fontSize: { xs: '0.75rem', md: '0.875rem' },
                     bgcolor: '#25D366',
                     '&:hover': { bgcolor: '#1DA851' }
                   }}
@@ -268,24 +275,24 @@ const Dashboard = () => {
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
-          <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
-              <TrendingUp sx={{ mr: 1, color: '#FF6B35' }} />
+          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+            <Typography variant="h6" sx={{ mb: { xs: 2, md: 3 }, display: 'flex', alignItems: 'center', fontSize: { xs: '1rem', md: '1.25rem' } }}>
+              <TrendingUp sx={{ mr: 1, color: '#FF6B35', fontSize: { xs: 20, md: 24 } }} />
               Resumo do Negócio
             </Typography>
             
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Box sx={{ mb: { xs: 2, md: 3 } }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                 Status do Sistema
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <CheckCircle sx={{ color: 'success.main', fontSize: 20 }} />
-                <Typography variant="body1">Sistema Operacional</Typography>
+                <CheckCircle sx={{ color: 'success.main', fontSize: { xs: 18, md: 20 } }} />
+                <Typography variant="body1" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>Sistema Operacional</Typography>
               </Box>
             </Box>
 
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Box sx={{ mb: { xs: 2, md: 3 } }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                 Configuração
               </Typography>
               <LinearProgress 
@@ -293,16 +300,16 @@ const Dashboard = () => {
                 value={stats.whatsappStatus === 'connected' ? 100 : 50} 
                 sx={{ mb: 1 }}
               />
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                 {stats.whatsappStatus === 'connected' ? 'Configuração Completa' : 'Configure o WhatsApp'}
               </Typography>
             </Box>
 
             <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                 Próximos Passos
               </Typography>
-              <Typography variant="body2">
+              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                 {stats.whatsappStatus !== 'connected' 
                   ? '• Conectar WhatsApp para receber pedidos'
                   : '• Seu sistema está pronto para receber pedidos!'

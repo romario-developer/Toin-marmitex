@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard';
 import CadastroCardapio from './pages/CadastroCardapio';
 import Pedidos from './pages/Pedidos';
 import Configuracoes from './pages/Configuracoes';
+import Planos from './pages/Planos';
 import Login from './pages/Login';
 import ProtectedRoute from './components/ProtectedRoute';
 import NavBar from './components/NavBar';
@@ -59,6 +60,17 @@ export default function App() {
               <NavBar />
               <main className="p-4 sm:p-6">
                 <Configuracoes />
+              </main>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/planos"
+          element={
+            <ProtectedRoute>
+              <NavBar />
+              <main className="p-4 sm:p-6">
+                <Planos />
               </main>
             </ProtectedRoute>
           }

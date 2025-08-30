@@ -9,12 +9,17 @@ import {
   atualizarCardapioPorId,
   deletarCardapioPorId,
 } from '../controllers/cardapioController.js';
+import { verificarLimiteCardapio } from '../middleware/planoLimitacao.js';
+import { authenticateCliente } from '../middleware/clienteAuth.js';
 
 const router = express.Router();
 
+// Aplicar autenticação em todas as rotas
+router.use(authenticateCliente);
+
 // CRUD geral
 router.get('/', listarCardapios);
-router.post('/', criarCardapio);
+router.post('/', verificarLimiteCardapio, criarCardapio);
 
 // Endpoints "hoje" (usados pelo BOT) - DEVEM VIR ANTES de /:id
 router.get('/hoje', obterCardapioDeHoje);

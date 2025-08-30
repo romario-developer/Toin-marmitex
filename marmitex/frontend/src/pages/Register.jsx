@@ -551,12 +551,12 @@ const Register = () => {
 
   if (success) {
     return (
-      <Container maxWidth="sm" sx={{ py: 8 }}>
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="h4" sx={{ mb: 2, color: 'success.main' }}>
+      <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 }, px: { xs: 2, md: 3 } }}>
+        <Paper sx={{ p: { xs: 3, md: 4 }, textAlign: 'center' }}>
+          <Typography variant="h4" sx={{ mb: 2, color: 'success.main', fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
             ✅ Cadastro Realizado!
           </Typography>
-          <Typography variant="body1" sx={{ mb: 3 }}>
+          <Typography variant="body1" sx={{ mb: 3, fontSize: { xs: '0.875rem', md: '1rem' } }}>
             Sua conta foi criada com sucesso. Você será redirecionado para o login.
           </Typography>
         </Paper>
@@ -565,19 +565,37 @@ const Register = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 4 }}>
-      <Paper sx={{ p: 4 }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Restaurant sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+    <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 3 } }}>
+      <Paper sx={{ p: { xs: 3, md: 4 } }}>
+        <Box sx={{ textAlign: 'center', mb: { xs: 3, md: 4 } }}>
+          <Restaurant sx={{ fontSize: { xs: 40, md: 48 }, color: '#FF6B35', mb: 2 }} />
+          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
             Criar Conta
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
             Configure sua marmitaria em poucos passos
           </Typography>
         </Box>
 
-        <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
+        <Stepper 
+          activeStep={activeStep} 
+          sx={{ 
+            mb: { xs: 3, md: 4 },
+            '& .MuiStepLabel-label': { 
+              fontSize: { xs: '0.65rem', sm: '0.75rem', md: '0.875rem' },
+              whiteSpace: { xs: 'nowrap', sm: 'normal' },
+              overflow: { xs: 'hidden', sm: 'visible' },
+              textOverflow: { xs: 'ellipsis', sm: 'clip' },
+              maxWidth: { xs: '60px', sm: 'none' }
+            },
+            '& .MuiStepConnector-root': {
+              display: { xs: 'none', sm: 'block' }
+            },
+            '& .MuiStep-root': {
+              padding: { xs: '0 2px', sm: '0 8px' }
+            }
+          }}
+        >
           {steps.map((label) => (
             <Step key={label}>
               <StepLabel>{label}</StepLabel>
@@ -591,24 +609,26 @@ const Register = () => {
           </Alert>
         )}
 
-        <Box sx={{ mb: 4 }}>
+        <Box sx={{ mb: { xs: 3, md: 4 } }}>
           {renderStepContent(activeStep)}
         </Box>
 
-        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', flexDirection: { xs: 'column', sm: 'row' }, gap: { xs: 2, sm: 0 } }}>
           <Button
             disabled={activeStep === 0}
             onClick={handleBack}
             variant="outlined"
+            sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, py: { xs: 1, md: 1.25 } }}
           >
             Voltar
           </Button>
           
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: { xs: 1, md: 2 }, flexDirection: { xs: 'column', sm: 'row' } }}>
             <Button
               component={Link}
               to="/login"
               variant="text"
+              sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, py: { xs: 1, md: 1.25 } }}
             >
               Já tenho conta
             </Button>
@@ -618,7 +638,7 @@ const Register = () => {
                 onClick={handleSubmit}
                 variant="contained"
                 disabled={loading || !validateStep(activeStep)}
-                sx={{ bgcolor: '#FF6B35' }}
+                sx={{ bgcolor: '#FF6B35', fontSize: { xs: '0.875rem', md: '1rem' }, py: { xs: 1, md: 1.25 } }}
               >
                 {loading ? 'Criando...' : 'Criar Conta'}
               </Button>
@@ -627,7 +647,7 @@ const Register = () => {
                 onClick={handleNext}
                 variant="contained"
                 disabled={!validateStep(activeStep)}
-                sx={{ bgcolor: '#FF6B35' }}
+                sx={{ bgcolor: '#FF6B35', fontSize: { xs: '0.875rem', md: '1rem' }, py: { xs: 1, md: 1.25 } }}
               >
                 Próximo
               </Button>

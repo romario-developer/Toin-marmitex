@@ -175,6 +175,7 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
     headless = true,
     logQR = true,
     debug = false,
+    callbacks = {}
   } = options;
 
   const clientPromise = wppconnect
@@ -221,6 +222,13 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
       catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
         console.log(`📱 QR Code gerado - Tentativa ${attempts || 1}`);
         
+        // Chamar callback personalizado se disponível
+        if (callbacks.onQRCode) {
+          console.log(`🔍 [DEBUG] Chamando callback onQRCode personalizado`);
+          callbacks.onQRCode(base64Qr, asciiQR, attempts, urlCode);
+          return; // Usar apenas o callback personalizado
+        }
+        
         // Log do QR no terminal se disponível
         if (asciiQR) {
           console.log('📲 QR Code ASCII:');
@@ -228,7 +236,9 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
         }
         
         // Salva QR como imagem com tratamento de erro melhorado
-        const qrPath = path.join(QR_DIR, `qr-cliente_${sessionId}.png`);
+        // Se sessionId já contém 'cliente_', não duplicar
+        const qrFileName = sessionId.startsWith('cliente_') ? `qr-${sessionId}.png` : `qr-cliente_${sessionId}.png`;
+        const qrPath = path.join(QR_DIR, qrFileName);
         
         // Verificar se já existe um QR válido (evitar substituir durante múltiplas tentativas)
         if (fs.existsSync(qrPath)) {
@@ -316,7 +326,39 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
     })
     .then((client) => {
       console.log('✅ WPPConnect criado. Aguardando login...');
-      attachDefaultListeners(client, sessionId);
+      
+      // Configurar listeners personalizados se disponíveis
+      if (callbacks.onConnected) {
+        client.onStateChange((state) => {
+          console.log(`🔄 Estado da sessão (${sessionId}):`, state);
+          if (state === 'CONNECTED') {
+            console.log(`🔍 [DEBUG] Chamando callback onConnected personalizado`);
+            callbacks.onConnected();
+          }
+        });
+      }
+      
+      if (callbacks.onDisconnected) {
+        client.onStreamChange((stream) => {
+          console.log(`📡 Status da sessão (${sessionId}):`, stream);
+          if (stream === 'DISCONNECTED') {
+            console.log(`🔍 [DEBUG] Chamando callback onDisconnected personalizado`);
+            callbacks.onDisconnected();
+          }
+        });
+      }
+      
+      if (callbacks.onMessage) {
+        client.onMessage((message) => {
+          console.log(`📨 Mensagem recebida para ${sessionId}`);
+          callbacks.onMessage(message);
+        });
+      }
+      
+      // Configurar listeners padrão apenas se não há callbacks personalizados
+      if (!callbacks.onConnected && !callbacks.onDisconnected && !callbacks.onMessage) {
+        attachDefaultListeners(client, sessionId);
+      }
       
       // Configurar reconexão automática APENAS se explicitamente solicitado
       if (options.autoReconnect === true) {
@@ -345,8 +387,8 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
   return clientPromise;
 }
 
-export async function startClient(sessionId = 'marmitex-bot', options = {}) {
-  return initWpp(sessionId, options);
+export async function startClient(sessionId = 'marmitex-bot', callbacks = {}) {
+  return initWpp(sessionId, { callbacks });
 }
 
 export async function getClient(sessionId = 'marmitex-bot') {

@@ -61,8 +61,11 @@ class MultiTenantWhatsAppManager {
       
       // Configurar callbacks específicos do cliente
       const callbacks = {
-        onQRCode: async (qrCode) => {
-          console.log(`📱 QR Code gerado para cliente ${clienteId}`);
+        onQRCode: async (qrCode, asciiQR, attempts, urlCode) => {
+          console.log(`📱 QR Code gerado para cliente ${clienteId} - Tentativa ${attempts || 1}`);
+          console.log(`🔍 [DEBUG] QR Code length: ${qrCode?.length || 0} chars`);
+          console.log(`🔍 [DEBUG] QR Code type: ${typeof qrCode}`);
+          console.log(`🔍 [DEBUG] Parâmetros recebidos:`, { qrCodeType: typeof qrCode, asciiQR: !!asciiQR, attempts, urlCode });
           
           // Salvar QR code como arquivo de imagem
           try {
@@ -74,12 +77,33 @@ class MultiTenantWhatsAppManager {
               fs.mkdirSync(qrDir, { recursive: true });
             }
             
-            // Remover prefixo data URL se presente
-            const base64Data = qrCode.replace(/^data:image\/[a-z]+;base64,/, '');
+            // Processar QR code baseado no tipo recebido
+            let base64Data;
+            if (typeof qrCode === 'string') {
+              // Remover prefixo data URL se presente
+              base64Data = qrCode.replace(/^data:image\/[a-z]+;base64,/, '');
+              console.log(`🔍 [DEBUG] QR processado como string, tamanho base64: ${base64Data.length}`);
+            } else if (qrCode && typeof qrCode === 'object') {
+              console.log(`🔍 [DEBUG] QR recebido como objeto:`, Object.keys(qrCode));
+              // Tentar extrair base64 de diferentes propriedades possíveis
+              base64Data = qrCode.qrcode || qrCode.base64 || qrCode.data || qrCode;
+              if (typeof base64Data === 'string') {
+                base64Data = base64Data.replace(/^data:image\/[a-z]+;base64,/, '');
+              }
+            } else {
+              console.error(`❌ Formato de QR Code não suportado:`, typeof qrCode);
+              return;
+            }
+            
+            // Validar se temos dados válidos
+            if (!base64Data || typeof base64Data !== 'string' || base64Data.length < 100) {
+              console.error(`❌ QR Code base64 inválido ou muito pequeno: ${base64Data?.length || 0} chars`);
+              return;
+            }
             
             // Salvar arquivo
             fs.writeFileSync(qrPath, base64Data, 'base64');
-            console.log(`🖼️ QR Code salvo em: ${qrPath}`);
+            console.log(`🖼️ QR Code salvo em: ${qrPath} (${base64Data.length} chars)`);
           } catch (error) {
             console.error('❌ Erro ao salvar QR Code:', error);
           }
@@ -90,56 +114,92 @@ class MultiTenantWhatsAppManager {
           });
           
           if (this.socketIO) {
+            console.log(`🔍 [DEBUG] Emitindo QR Code via Socket.IO para cliente_${clienteId}`);
             this.socketIO.to(`cliente_${clienteId}`).emit('qr_code', {
               qrCode,
               clienteId
             });
+            console.log(`✅ [DEBUG] QR Code emitido com sucesso via Socket.IO`);
+          } else {
+            console.warn(`⚠️ [DEBUG] Socket.IO não disponível para emitir QR Code`);
           }
         },
         
         onConnected: async () => {
           console.log(`✅ WhatsApp conectado para cliente ${clienteId}`);
+          console.log(`🔍 [DEBUG] Iniciando processo de atualização de status para 'connected'`);
           
-          await Cliente.findByIdAndUpdate(clienteId, {
-            'whatsapp.statusConexao': 'connected',
-            'whatsapp.ultimaConexao': new Date(),
-            'whatsapp.qrCode': null
-          });
+          try {
+            await Cliente.findByIdAndUpdate(clienteId, {
+              'whatsapp.statusConexao': 'connected',
+              'whatsapp.ultimaConexao': new Date(),
+              'whatsapp.qrCode': null
+            });
+            console.log(`✅ [DEBUG] Status atualizado no banco de dados`);
+          } catch (error) {
+            console.error(`❌ [DEBUG] Erro ao atualizar status no banco:`, error);
+          }
           
           // Atualizar instância local
           const instance = this.clienteInstances.get(clienteId);
           if (instance) {
             instance.status = 'connected';
             instance.connectedAt = new Date();
+            instance.lastActivity = new Date();
+            console.log(`✅ [DEBUG] Instância local atualizada para 'connected'`);
+            console.log(`🔍 [DEBUG] Status da instância: ${instance.status}`);
+          } else {
+            console.warn(`⚠️ [DEBUG] Instância local não encontrada para cliente ${clienteId}`);
+            console.log(`🔍 [DEBUG] Instâncias disponíveis: ${Array.from(this.clienteInstances.keys()).join(', ')}`);
           }
           
           if (this.socketIO) {
+            console.log(`🔍 [DEBUG] Emitindo evento 'whatsapp_connected' via Socket.IO`);
             this.socketIO.to(`cliente_${clienteId}`).emit('whatsapp_connected', {
               clienteId,
               status: 'connected'
             });
+            console.log(`✅ [DEBUG] Evento 'whatsapp_connected' emitido com sucesso`);
+          } else {
+            console.warn(`⚠️ [DEBUG] Socket.IO não disponível para emitir evento de conexão`);
           }
         },
         
         onDisconnected: async () => {
           console.log(`❌ WhatsApp desconectado para cliente ${clienteId}`);
+          console.log(`🔍 [DEBUG] Iniciando processo de desconexão para cliente ${clienteId}`);
           
-          await Cliente.findByIdAndUpdate(clienteId, {
-            'whatsapp.statusConexao': 'disconnected'
-          });
-          
-          // Limpar instância local
-          this.clienteInstances.delete(clienteId);
-          
-          if (this.socketIO) {
-            this.socketIO.to(`cliente_${clienteId}`).emit('whatsapp_disconnected', {
-              clienteId,
-              status: 'disconnected'
-            });
+          // Verificar se a instância ainda existe e há quanto tempo foi criada
+          const instance = this.clienteInstances.get(clienteId);
+          if (instance) {
+            const timeSinceCreation = Date.now() - instance.createdAt.getTime();
+            console.log(`🔍 [DEBUG] Tempo desde criação da instância: ${timeSinceCreation}ms`);
+            
+            // Se a instância foi criada há menos de 30 segundos, aguardar antes de desconectar
+            // Isso evita desconexões prematuras durante o processo de conexão
+            if (timeSinceCreation < 30000) {
+              console.log(`⏳ [DEBUG] Instância muito recente (${timeSinceCreation}ms) - aguardando 10s antes de processar desconexão`);
+              setTimeout(async () => {
+                // Verificar novamente se ainda deve desconectar
+                const currentInstance = this.clienteInstances.get(clienteId);
+                if (currentInstance && currentInstance.status !== 'connected') {
+                  console.log(`🔍 [DEBUG] Processando desconexão após delay para cliente ${clienteId}`);
+                  await this.processDisconnection(clienteId);
+                } else {
+                  console.log(`✅ [DEBUG] Instância já conectada - cancelando desconexão para cliente ${clienteId}`);
+                }
+              }, 10000);
+              return;
+            }
           }
+          
+          // Processar desconexão imediatamente se a instância é antiga
+          await this.processDisconnection(clienteId);
         },
         
         onMessage: async (message) => {
+          console.log(`📨 [DEBUG] Mensagem recebida para cliente ${clienteId}`);
+          console.log(`🔍 [DEBUG] Verificando instância antes de processar mensagem...`);
           await this.handleMessage(clienteId, message);
         }
       };
@@ -161,6 +221,8 @@ class MultiTenantWhatsAppManager {
       this.clienteInstances.set(clienteId, instance);
       
       console.log(`🚀 Instância iniciada para cliente ${clienteId}`);
+      console.log(`🔍 [DEBUG] Status inicial da instância: ${instance.status}`);
+      console.log(`🔍 [DEBUG] Instância armazenada no Map com chave: ${clienteId}`);
       return instance;
       
     } catch (error) {
@@ -175,6 +237,41 @@ class MultiTenantWhatsAppManager {
     }
   }
   
+  // Método para processar desconexão
+  async processDisconnection(clienteId) {
+    try {
+      console.log(`🔍 [DEBUG] Processando desconexão para cliente ${clienteId}`);
+      
+      // Atualizar status no banco
+      await Cliente.findByIdAndUpdate(clienteId, {
+        'whatsapp.statusConexao': 'disconnected'
+      });
+      console.log(`✅ [DEBUG] Status de desconexão atualizado no banco de dados`);
+      
+      // Limpar instância local
+      const instanceExists = this.clienteInstances.has(clienteId);
+      console.log(`🔍 [DEBUG] Instância local existe: ${instanceExists}`);
+      
+      this.clienteInstances.delete(clienteId);
+      console.log(`✅ [DEBUG] Instância local removida para cliente ${clienteId}`);
+      
+      // Emitir evento via Socket.IO
+      if (this.socketIO) {
+        console.log(`🔍 [DEBUG] Emitindo evento 'whatsapp_disconnected' via Socket.IO`);
+        this.socketIO.to(`cliente_${clienteId}`).emit('whatsapp_disconnected', {
+          clienteId,
+          status: 'disconnected'
+        });
+        console.log(`✅ [DEBUG] Evento 'whatsapp_disconnected' emitido com sucesso`);
+      } else {
+        console.warn(`⚠️ [DEBUG] Socket.IO não disponível para emitir evento de desconexão`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ [DEBUG] Erro ao processar desconexão:`, error);
+    }
+  }
+
   // Parar instância de um cliente
   async stopClientInstance(clienteId) {
     try {
@@ -196,13 +293,8 @@ class MultiTenantWhatsAppManager {
         }
       }
       
-      // Remover instância
-      this.clienteInstances.delete(clienteId);
-      
-      // Atualizar status no banco
-      await Cliente.findByIdAndUpdate(clienteId, {
-        'whatsapp.statusConexao': 'disconnected'
-      });
+      // Processar desconexão
+      await this.processDisconnection(clienteId);
       
       console.log(`🛑 Instância parada para cliente ${clienteId}`);
       
@@ -215,10 +307,63 @@ class MultiTenantWhatsAppManager {
   // Processar mensagem recebida
   async handleMessage(clienteId, message) {
     try {
-      const instance = this.clienteInstances.get(clienteId);
+      console.log(`🔍 [DEBUG] Processando mensagem para cliente ${clienteId}`);
+      let instance = this.clienteInstances.get(clienteId);
+      console.log(`🔍 [DEBUG] Instância encontrada: ${!!instance}`);
+      
+      if (instance) {
+        console.log(`🔍 [DEBUG] Status da instância: ${instance.status}`);
+        console.log(`🔍 [DEBUG] Criada em: ${instance.createdAt}`);
+        console.log(`🔍 [DEBUG] Última atividade: ${instance.lastActivity}`);
+      } else {
+        console.log(`🔍 [DEBUG] Instâncias disponíveis: ${Array.from(this.clienteInstances.keys()).join(', ')}`);
+      }
+      
+      // Se não há instância ou não está conectada, tentar criar uma nova
       if (!instance || instance.status !== 'connected') {
-        console.log(`⚠️ Instância não conectada para cliente ${clienteId}`);
-        return;
+        console.log(`⚠️ Instância não conectada para cliente ${clienteId} - Status: ${instance?.status || 'N/A'}`);
+        console.log(`🔄 [AUTO-START] Tentando criar instância automaticamente para cliente ${clienteId}`);
+        
+        try {
+          // Verificar se o cliente existe no banco de dados
+          const cliente = await Cliente.findById(clienteId);
+          if (!cliente) {
+            console.log(`❌ [AUTO-START] Cliente ${clienteId} não encontrado no banco de dados`);
+            return;
+          }
+          
+          console.log(`✅ [AUTO-START] Cliente encontrado: ${cliente.nome}`);
+          console.log(`🚀 [AUTO-START] Iniciando instância automaticamente...`);
+          
+          // Criar nova instância
+          instance = await this.startClientInstance(clienteId);
+          
+          // Aguardar um pouco para a instância se conectar
+          console.log(`⏳ [AUTO-START] Aguardando conexão da instância...`);
+          let attempts = 0;
+          const maxAttempts = 30; // 30 segundos
+          
+          while (attempts < maxAttempts && (!instance || instance.status !== 'connected')) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            instance = this.clienteInstances.get(clienteId);
+            attempts++;
+            
+            if (attempts % 5 === 0) {
+              console.log(`⏳ [AUTO-START] Aguardando conexão... ${attempts}/${maxAttempts}s`);
+            }
+          }
+          
+          if (!instance || instance.status !== 'connected') {
+            console.log(`❌ [AUTO-START] Instância não conectou após ${maxAttempts}s - mensagem será perdida`);
+            return;
+          }
+          
+          console.log(`✅ [AUTO-START] Instância conectada com sucesso! Processando mensagem...`);
+          
+        } catch (autoStartError) {
+          console.error(`❌ [AUTO-START] Erro ao criar instância automaticamente:`, autoStartError);
+          return;
+        }
       }
       
       // Atualizar última atividade
@@ -226,6 +371,12 @@ class MultiTenantWhatsAppManager {
       
       const telefone = message.from;
       const texto = message.body?.toLowerCase()?.trim() || '';
+      
+      // 🚫 Bloquear mensagens de status do WhatsApp
+      if (telefone.includes('status@broadcast')) {
+        console.log(`🚫 Mensagem de status bloqueada de ${telefone}`);
+        return;
+      }
       
       // Verificar se é um número permitido
       const isAllowed = await this.isNumberAllowed(clienteId, telefone);
@@ -263,21 +414,17 @@ class MultiTenantWhatsAppManager {
   // Verificar se número é permitido para o cliente
   async isNumberAllowed(clienteId, telefone) {
     try {
-      const cliente = await Cliente.findById(clienteId);
-      if (!cliente) return false;
+      // MODO TESTE: Apenas o número 73991472169 é permitido
+      const numeroLimpo = telefone.replace('@c.us', '').replace(/\D/g, '');
+      const numeroTeste = '73991472169';
       
-      // Se o cliente não tem modo privado ativo, permitir todos
-      if (!cliente.configuracoes?.modoPrivado) {
+      if (numeroLimpo.endsWith(numeroTeste)) {
+        console.log(`✅ Número de teste permitido: ${numeroLimpo}`);
         return true;
       }
       
-      // Verificar na lista de números permitidos
-      const numeroPermitido = await NumeroPermitido.findOne({
-        clienteId,
-        numero: telefone.replace('@c.us', '')
-      });
-      
-      return !!numeroPermitido;
+      console.log(`🚫 Número bloqueado para teste: ${numeroLimpo} (apenas ${numeroTeste} é permitido)`);
+      return false;
       
     } catch (error) {
       console.error('❌ Erro ao verificar número permitido:', error);
@@ -362,18 +509,29 @@ class MultiTenantWhatsAppManager {
     const { clienteId, telefone } = session;
     
     // Buscar cardápio do cliente
-    const hoje = new Date().toISOString().split('T')[0];
-    const cardapio = await Cardapio.findOne({ clienteId, data: hoje });
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
     
-    if (!cardapio || !cardapio.itens.length) {
+    const amanha = new Date(hoje);
+    amanha.setDate(amanha.getDate() + 1);
+    
+    const cardapio = await Cardapio.findOne({
+      clienteId,
+      data: {
+        $gte: hoje,
+        $lt: amanha
+      }
+    });
+    
+    if (!cardapio || !cardapio.cardapios || !cardapio.cardapios.length) {
       await this.sendMessage(clienteId, telefone, 
         '😔 Desculpe, não temos cardápio disponível hoje.\n\nTente novamente mais tarde.');
       return;
     }
     
     let mensagem = '🍽️ *Cardápio de Hoje*\n\n';
-    cardapio.itens.forEach((item, index) => {
-      mensagem += `*${index + 1}.* ${item.descricao}\n`;
+    cardapio.cardapios.forEach((cardapioItem, index) => {
+      mensagem += `*${cardapioItem.numero}.* ${cardapioItem.item.descricao}\n`;
     });
     
     mensagem += '\n📋 *Opções:*\n';
@@ -646,6 +804,11 @@ class MultiTenantWhatsAppManager {
   // Verificar se cliente está conectado
   isClientConnected(clienteId) {
     const instance = this.clienteInstances.get(clienteId);
+    console.log(`🔍 [DEBUG] Verificando conexão para cliente ${clienteId}:`);
+    console.log(`🔍 [DEBUG] - Instância existe: ${!!instance}`);
+    console.log(`🔍 [DEBUG] - Status: ${instance?.status || 'N/A'}`);
+    console.log(`🔍 [DEBUG] - Total de instâncias: ${this.clienteInstances.size}`);
+    console.log(`🔍 [DEBUG] - Chaves das instâncias: ${Array.from(this.clienteInstances.keys()).join(', ')}`);
     return instance && instance.status === 'connected';
   }
   

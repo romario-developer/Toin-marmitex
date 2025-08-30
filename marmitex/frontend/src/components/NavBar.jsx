@@ -51,6 +51,7 @@ export default function NavBar() {
         <NavLink to="/cardapio" className={linkCls}>Cadastro de Cardápio</NavLink>
         <NavLink to="/pedidos" className={linkCls}>Pedidos</NavLink>
         <NavLink to="/configuracoes" className={linkCls}>Configurações</NavLink>
+        <NavLink to="/planos" className={linkCls}>Planos</NavLink>
       </nav>
 
       {/* Nav mobile dropdown */}
@@ -60,6 +61,7 @@ export default function NavBar() {
           <NavLink to="/cardapio" className={linkCls} onClick={() => setOpen(false)}>Cadastro de Cardápio</NavLink>
           <NavLink to="/pedidos" className={linkCls} onClick={() => setOpen(false)}>Pedidos</NavLink>
           <NavLink to="/configuracoes" className={linkCls} onClick={() => setOpen(false)}>Configurações</NavLink>
+          <NavLink to="/planos" className={linkCls} onClick={() => setOpen(false)}>Planos</NavLink>
 
           <div className="flex items-center justify-between pt-2 border-t">
             <div className="flex items-center gap-2">

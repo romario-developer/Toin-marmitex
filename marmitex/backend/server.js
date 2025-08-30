@@ -60,9 +60,9 @@ app.get('/qr/view', (_req, res) => {
     const allFiles = fs.readdirSync(QR_DIR);
     console.log('📁 Todos os arquivos no diretório:', allFiles);
     
-    // Priorizar QR codes específicos de clientes (formato: qr_clienteId.png)
-    const clienteQrFiles = allFiles.filter(file => file.startsWith('qr_') && file.endsWith('.png'));
-    const genericQrFiles = allFiles.filter(file => file.startsWith('qr-') && file.endsWith('.png'));
+    // Priorizar QR codes específicos de clientes (formato correto: qr-cliente_clienteId.png)
+    const clienteQrFiles = allFiles.filter(file => file.startsWith('qr-cliente_') && file.endsWith('.png'));
+    const genericQrFiles = allFiles.filter(file => file.startsWith('qr-') && file.endsWith('.png') && !file.startsWith('qr-cliente_'));
     
     console.log('🖼️ QR codes de clientes encontrados:', clienteQrFiles);
     console.log('🖼️ QR codes genéricos encontrados:', genericQrFiles);
@@ -256,6 +256,15 @@ async function mountApiRoutes() {
       console.error('❌ Erro ao carregar rotas do Dashboard:', err.message);
     }
 
+    // Importar e montar rotas de planos
+    try {
+      const planosRoutes = await import('./routes/planos.js');
+      app.use('/api/planos', planosRoutes.default);
+      console.log('✅ Rotas de planos montadas em /api/planos');
+    } catch (err) {
+      console.error('❌ Erro ao carregar rotas de planos:', err.message);
+    }
+
     // Importar e montar outras rotas se existirem
     const optionalRoutes = [
       { file: './routes/index.js', path: '/api' },
@@ -360,15 +369,25 @@ async function start() {
     
     // Gerenciar conexões WebSocket
     io.on('connection', (socket) => {
-      console.log('Admin conectado:', socket.id);
+      console.log('🔌 Cliente conectado:', socket.id);
       
+      // Sala para admins (notificações gerais)
       socket.on('join-admin', () => {
         socket.join('admin-room');
-        console.log('Admin entrou na sala de notificações');
+        console.log('👨‍💼 Admin entrou na sala de notificações');
+      });
+      
+      // Sala específica para cada cliente (WhatsApp em tempo real)
+      socket.on('join', (room) => {
+        socket.join(room);
+        console.log(`📡 Cliente entrou na sala: ${room}`);
+        
+        // Confirmar entrada na sala
+        socket.emit('joined', { room, message: 'Conectado ao tempo real' });
       });
       
       socket.on('disconnect', () => {
-        console.log('Admin desconectado:', socket.id);
+        console.log('🔌 Cliente desconectado:', socket.id);
       });
     });
 

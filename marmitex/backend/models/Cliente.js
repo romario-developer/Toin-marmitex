@@ -132,8 +132,8 @@ const clienteSchema = new mongoose.Schema({
   plano: {
     tipo: {
       type: String,
-      enum: ['basico', 'premium', 'enterprise'],
-      default: 'basico'
+      enum: ['gratis', 'profissional', 'enterprise', 'basico', 'premium'], // Mantém compatibilidade
+      default: 'gratis'
     },
     dataVencimento: {
       type: Date,
@@ -142,6 +142,19 @@ const clienteSchema = new mongoose.Schema({
     ativo: {
       type: Boolean,
       default: true
+    },
+    // Dados do trial
+    trial: {
+      ativo: {
+        type: Boolean,
+        default: false
+      },
+      dataInicio: {
+        type: Date
+      },
+      dataFim: {
+        type: Date
+      }
     }
   },
   

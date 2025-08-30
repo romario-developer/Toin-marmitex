@@ -57,14 +57,14 @@ const Login = () => {
   };
 
   return (
-    <Container maxWidth="sm" sx={{ py: 8 }}>
-      <Paper sx={{ p: 4 }}>
-        <Box sx={{ textAlign: 'center', mb: 4 }}>
-          <Restaurant sx={{ fontSize: 48, color: '#FF6B35', mb: 2 }} />
-          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1 }}>
+    <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 }, px: { xs: 2, md: 3 } }}>
+      <Paper sx={{ p: { xs: 3, md: 4 } }}>
+        <Box sx={{ textAlign: 'center', mb: { xs: 3, md: 4 } }}>
+          <Restaurant sx={{ fontSize: { xs: 40, md: 48 }, color: '#FF6B35', mb: 2 }} />
+          <Typography variant="h4" sx={{ fontWeight: 'bold', mb: 1, fontSize: { xs: '1.75rem', md: '2.125rem' } }}>
             Entrar
           </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
             Acesse sua conta Marmitex
           </Typography>
         </Box>
@@ -89,7 +89,7 @@ const Login = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            sx={{ mb: 3 }}
+            sx={{ mb: { xs: 2.5, md: 3 } }}
           />
           
           <TextField
@@ -99,7 +99,7 @@ const Login = () => {
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             required
-            sx={{ mb: 3 }}
+            sx={{ mb: { xs: 2.5, md: 3 } }}
           />
           
           <Button
@@ -108,8 +108,9 @@ const Login = () => {
             variant="contained"
             disabled={loading}
             sx={{ 
-              py: 1.5,
-              mb: 3,
+              py: { xs: 1.25, md: 1.5 },
+              mb: { xs: 2.5, md: 3 },
+              fontSize: { xs: '0.875rem', md: '1rem' },
               bgcolor: '#FF6B35',
               '&:hover': { bgcolor: '#E55A2B' }
             }}
@@ -118,10 +119,10 @@ const Login = () => {
           </Button>
         </Box>
 
-        <Divider sx={{ my: 3 }} />
+        <Divider sx={{ my: { xs: 2.5, md: 3 } }} />
         
         <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
             Ainda não tem uma conta?
           </Typography>
           <Button
@@ -130,6 +131,8 @@ const Login = () => {
             variant="outlined"
             fullWidth
             sx={{ 
+              py: { xs: 1, md: 1.25 },
+              fontSize: { xs: '0.875rem', md: '1rem' },
               borderColor: '#FF6B35',
               color: '#FF6B35',
               '&:hover': { 
@@ -142,13 +145,13 @@ const Login = () => {
           </Button>
         </Box>
         
-        <Box sx={{ textAlign: 'center', mt: 3 }}>
+        <Box sx={{ textAlign: 'center', mt: { xs: 2.5, md: 3 } }}>
           <Button
             component={Link}
             to="/"
             variant="text"
             size="small"
-            sx={{ color: 'text.secondary' }}
+            sx={{ color: 'text.secondary', fontSize: { xs: '0.75rem', md: '0.875rem' } }}
           >
             ← Voltar ao início
           </Button>

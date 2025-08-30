@@ -1,5 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
+import { io } from 'socket.io-client';
 import api from "../services/api";
+
+// Configuração do Socket.IO
+const API_BASE = import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 // Componente para seção do WhatsApp
 function WhatsAppSection() {
@@ -8,6 +12,101 @@ function WhatsAppSection() {
   const [loading, setLoading] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false); // Prevenir múltiplas chamadas
   const [sessionInfo, setSessionInfo] = useState(null); // Informações da sessão salva
+  const [qrRefreshInterval, setQrRefreshInterval] = useState(null); // Intervalo de auto-refresh do QR
+  const [socket, setSocket] = useState(null); // Socket.IO connection
+  const [realTimeStatus, setRealTimeStatus] = useState(null); // Status em tempo real
+
+  // Configurar WebSocket para atualizações em tempo real
+  useEffect(() => {
+    console.log('🔍 [DEBUG] Configurando conexão WebSocket');
+    
+    const newSocket = io(API_BASE, {
+      withCredentials: true,
+    });
+
+    newSocket.on('connect', () => {
+      console.log('✅ [DEBUG] WebSocket conectado:', newSocket.id);
+      console.log('🔌 Conectado ao servidor WebSocket');
+      // Entrar na sala específica do cliente (usando clienteId do token)
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const payload = JSON.parse(atob(token.split('.')[1]));
+          const clienteId = payload.clienteId;
+          console.log('🔍 [DEBUG] ClienteId extraído do token:', clienteId);
+          const room = `cliente_${clienteId}`;
+          console.log('🔍 [DEBUG] Entrando na sala:', room);
+          newSocket.emit('join', room);
+          console.log(`📡 Entrando na sala: cliente_${clienteId}`);
+        } catch (error) {
+          console.error('❌ [DEBUG] Erro ao extrair clienteId do token:', error);
+          console.error('❌ Erro ao extrair clienteId do token:', error);
+        }
+      } else {
+        console.warn('⚠️ [DEBUG] Token não encontrado no localStorage');
+      }
+    });
+
+    // Eventos de sala
+    newSocket.on('joined', (data) => {
+      console.log('✅ [DEBUG] Entrou na sala:', data);
+      setRealTimeStatus('Conectado ao tempo real');
+    });
+
+    // Escutar eventos do WhatsApp em tempo real
+    newSocket.on('qr_code', (data) => {
+      console.log('📱 [DEBUG] QR Code recebido via WebSocket:', data);
+      console.log('📱 QR Code recebido via WebSocket:', data);
+      
+      // Verificar se o QR Code já tem o prefixo data:image/png;base64,
+      const qrCodeUrl = data.qrCode.startsWith('data:image/png;base64,') 
+        ? data.qrCode 
+        : `data:image/png;base64,${data.qrCode}`;
+      
+      setQrCode(qrCodeUrl);
+      setWhatsappStatus('qr');
+      setRealTimeStatus('QR Code gerado - escaneie para conectar');
+      
+      // Iniciar auto-refresh quando QR for recebido
+      startQRAutoRefresh();
+    });
+
+    newSocket.on('whatsapp_connected', (data) => {
+      console.log('✅ [DEBUG] WhatsApp conectado via WebSocket:', data);
+      console.log('✅ WhatsApp conectado via WebSocket:', data);
+      setWhatsappStatus('connected');
+      setQrCode(null);
+      setRealTimeStatus('WhatsApp conectado com sucesso!');
+      
+      // Parar auto-refresh quando conectar
+      stopQRAutoRefresh();
+    });
+
+    newSocket.on('whatsapp_disconnected', (data) => {
+      console.log('❌ [DEBUG] WhatsApp desconectado via WebSocket:', data);
+      console.log('❌ WhatsApp desconectado via WebSocket:', data);
+      setWhatsappStatus('disconnected');
+      setQrCode(null);
+      setRealTimeStatus('WhatsApp desconectado');
+      
+      // Parar auto-refresh quando desconectar
+      stopQRAutoRefresh();
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('❌ [DEBUG] WebSocket desconectado');
+      console.log('🔌 Desconectado do servidor WebSocket');
+      setRealTimeStatus(null);
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      console.log('🔌 [DEBUG] Desconectando WebSocket');
+      console.log('🔌 Fechando conexão WebSocket');
+      newSocket.close();
+    };
+  }, []);
 
   const checkStatus = useCallback(async (forceUpdate = false) => {
      try {
@@ -104,6 +203,76 @@ function WhatsAppSection() {
      }
    };
 
+   const refreshQRCode = async () => {
+     try {
+       console.log('🔄 Atualizando QR code...');
+       
+       // Tentar buscar QR code via rota direta
+       const qrResponse = await fetch('http://localhost:5000/qr/view', {
+         method: 'GET',
+         headers: {
+           'Cache-Control': 'no-cache',
+           'Pragma': 'no-cache'
+         }
+       });
+       
+       if (qrResponse.ok) {
+         const contentType = qrResponse.headers.get('content-type');
+         if (contentType && contentType.includes('image')) {
+           const qrBlob = await qrResponse.blob();
+           const qrUrl = URL.createObjectURL(qrBlob);
+           setQrCode(qrUrl);
+           console.log('✅ QR Code atualizado com sucesso!');
+           return true;
+         }
+       }
+       
+       // Fallback para API
+       const apiResponse = await api.get('/api/clientes/whatsapp/qr-code');
+       if (apiResponse.data.success && apiResponse.data.qrCode) {
+         // Verificar se o QR Code já tem o prefixo data:image/png;base64,
+         const qrCodeUrl = apiResponse.data.qrCode.startsWith('data:image/png;base64,') 
+           ? apiResponse.data.qrCode 
+           : `data:image/png;base64,${apiResponse.data.qrCode}`;
+         
+         setQrCode(qrCodeUrl);
+         console.log('✅ QR Code carregado via API fallback');
+         return true;
+       }
+       
+       return false;
+     } catch (error) {
+       console.error('❌ Erro ao atualizar QR code:', error);
+       return false;
+     }
+   };
+
+   const startQRAutoRefresh = () => {
+     // Limpar intervalo anterior se existir
+     if (qrRefreshInterval) {
+       clearInterval(qrRefreshInterval);
+     }
+     
+     // Configurar auto-refresh a cada 30 segundos
+     const interval = setInterval(() => {
+       if (whatsappStatus === 'qr') {
+         console.log('🔄 Auto-refresh do QR code...');
+         refreshQRCode();
+       }
+     }, 30000); // 30 segundos
+     
+     setQrRefreshInterval(interval);
+     console.log('⏰ Auto-refresh do QR code ativado (30s)');
+   };
+
+   const stopQRAutoRefresh = () => {
+     if (qrRefreshInterval) {
+       clearInterval(qrRefreshInterval);
+       setQrRefreshInterval(null);
+       console.log('⏹️ Auto-refresh do QR code desativado');
+     }
+   };
+
    const pollForQRCode = async () => {
      let attempts = 0;
      const maxAttempts = 20; // 20 tentativas (60 segundos)
@@ -118,37 +287,11 @@ function WhatsAppSection() {
      const poll = async () => {
        if (qrFound) return; // Parar se QR já foi encontrado
        
-       try {
-         console.log(`🔍 Tentativa ${attempts + 1}/${maxAttempts} - Buscando QR code...`);
-         
-         // Tentar buscar QR code via rota direta (sem autenticação)
-         const qrResponse = await fetch('http://localhost:5000/qr/view', {
-           method: 'GET',
-           headers: {
-             'Cache-Control': 'no-cache'
-           }
-         });
-         
-         console.log('📡 Resposta da rota QR:', {
-           status: qrResponse.status,
-           contentType: qrResponse.headers.get('content-type')
-         });
-         
-         if (qrResponse.ok) {
-           const contentType = qrResponse.headers.get('content-type');
-           if (contentType && contentType.includes('image')) {
-             const qrBlob = await qrResponse.blob();
-             const qrUrl = URL.createObjectURL(qrBlob);
-             setQrCode(qrUrl);
-             qrFound = true;
-             console.log('✅ QR Code carregado com sucesso via rota direta!');
-             return; // QR code encontrado, parar polling
-           }
-         }
-         
-         console.log('⚠️ QR code ainda não disponível');
-       } catch (error) {
-         console.log(`⏳ Tentativa ${attempts + 1}: QR code ainda não disponível...`, error.message);
+       const success = await refreshQRCode();
+       if (success) {
+         qrFound = true;
+         startQRAutoRefresh(); // Iniciar auto-refresh quando QR for encontrado
+         return;
        }
        
        attempts++;
@@ -164,9 +307,80 @@ function WhatsAppSection() {
      poll();
    };
  
+   const resetCompleto = async () => {
+     if (!confirm('Tem certeza que deseja fazer um reset completo? Isso irá limpar todos os dados de sessão e você precisará escanear o QR code novamente.')) {
+       return;
+     }
+     
+     setLoading(true);
+     try {
+       console.log('🔄 [DEBUG] Iniciando reset completo...');
+       
+       // Verificar se há token
+       const token = localStorage.getItem('token');
+       console.log('🔍 [DEBUG] Token encontrado:', token ? 'SIM' : 'NÃO');
+       console.log('🔍 [DEBUG] Token length:', token?.length || 0);
+       
+       if (!token) {
+         alert('Token de autenticação não encontrado. Faça login novamente.');
+         window.location.href = '/login';
+         return;
+       }
+       
+       stopQRAutoRefresh(); // Parar auto-refresh
+       
+       console.log('🔍 [DEBUG] Fazendo requisição para:', '/api/clientes/whatsapp/reset-completo');
+       console.log('🔍 [DEBUG] Headers da requisição:', {
+         'Authorization': `Bearer ${token.substring(0, 20)}...`,
+         'Content-Type': 'application/json'
+       });
+       
+       const response = await api.post('/api/clientes/whatsapp/reset-completo');
+       console.log('✅ [DEBUG] Resposta recebida:', response.data);
+       
+       if (response.data.success) {
+         setWhatsappStatus('disconnected');
+         setQrCode('');
+         setSessionInfo(null);
+         setRealTimeStatus('Reset completo realizado');
+         console.log('✅ [DEBUG] Reset completo realizado com sucesso!');
+         alert('Reset completo realizado! Todos os dados foram limpos. Você pode conectar novamente agora.');
+       } else {
+         console.error('❌ [DEBUG] Erro no reset:', response.data.message);
+         alert('Erro no reset: ' + response.data.message);
+       }
+     } catch (err) {
+       console.error('❌ [DEBUG] Erro ao fazer reset completo:', err);
+       console.error('❌ [DEBUG] Detalhes do erro:', {
+         message: err.message,
+         response: err.response?.data,
+         status: err.response?.status,
+         config: {
+           url: err.config?.url,
+           method: err.config?.method,
+           headers: err.config?.headers
+         }
+       });
+       
+       // Se for erro 401, redirecionar para login
+       if (err.response?.status === 401) {
+         alert('Sessão expirada. Redirecionando para o login...');
+         localStorage.removeItem('token');
+         window.location.href = '/login';
+         return;
+       }
+       
+       const errorMessage = err.response?.data?.message || err.response?.data?.details || err.message || 'Erro desconhecido';
+       alert('Erro ao fazer reset completo: ' + errorMessage);
+     } finally {
+       setLoading(false);
+     }
+   };
+
    const disconnectWhatsApp = async () => {
      setLoading(true);
      try {
+       stopQRAutoRefresh(); // Parar auto-refresh
        await api.post('/api/clientes/whatsapp/desconectar');
        setWhatsappStatus('disconnected');
        setQrCode('');
@@ -185,7 +399,19 @@ function WhatsAppSection() {
      
      setLoading(true);
      try {
+       const token = localStorage.getItem('token');
+       console.log('🔍 [DEBUG] Token para clearSessions:', token ? 'EXISTE' : 'NÃO EXISTE');
+       console.log('🔍 [DEBUG] Token length:', token?.length || 0);
+       
+       if (!token) {
+         alert('Token de autenticação não encontrado. Faça login novamente.');
+         window.location.href = '/login';
+         return;
+       }
+       
+       console.log('🔍 [DEBUG] Fazendo requisição para limpar sessões...');
        const response = await api.post('/api/whatsapp/limpar-sessoes');
+       console.log('🔍 [DEBUG] Resposta recebida:', response.data);
        
        if (response.data.success) {
          alert('✅ Sessões limpas com sucesso! Você pode iniciar uma nova conexão agora.');
@@ -198,7 +424,17 @@ function WhatsAppSection() {
          alert('❌ Erro ao limpar sessões: ' + response.data.message);
        }
      } catch (err) {
-       console.error('Erro ao limpar sessões:', err);
+       console.error('❌ [DEBUG] Erro ao limpar sessões:', err);
+       console.error('❌ [DEBUG] Detalhes do erro:', {
+         message: err.message,
+         response: err.response?.data,
+         status: err.response?.status,
+         config: {
+           url: err.config?.url,
+           method: err.config?.method,
+           headers: err.config?.headers
+         }
+       });
        alert('❌ Erro ao limpar sessões: ' + (err.response?.data?.message || err.message));
      } finally {
        setLoading(false);
@@ -223,7 +459,7 @@ function WhatsAppSection() {
          
          // Aguardar um pouco e começar o polling do QR code
          setTimeout(() => {
-           startQRPolling();
+           pollForQRCode();
          }, 3000);
        } else {
          alert('❌ Erro ao forçar nova conexão: ' + response.data.message);
@@ -262,7 +498,34 @@ function WhatsAppSection() {
 
   return (
     <div className="bg-white rounded-lg shadow p-4 mb-6">
-      <h2 className="text-lg font-semibold mb-4">📱 WhatsApp</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">📱 WhatsApp</h2>
+        
+        {/* Indicador de conexão WebSocket */}
+        <div className="flex items-center gap-2">
+          {socket?.connected ? (
+            <div className="flex items-center gap-2 text-green-600 text-sm">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Tempo real ativo</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-gray-500 text-sm">
+              <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+              <span>Tempo real inativo</span>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Status em tempo real */}
+      {realTimeStatus && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600">📡</span>
+            <span className="text-blue-800 text-sm font-medium">{realTimeStatus}</span>
+          </div>
+        </div>
+      )}
       
       <div className="mb-4">
         <div className="flex items-center justify-between mb-3">
@@ -349,6 +612,14 @@ function WhatsAppSection() {
            >
              {loading ? 'Iniciando...' : 'Nova Conexão'}
            </button>
+           
+           <button
+             onClick={resetCompleto}
+             disabled={loading}
+             className="bg-red-800 text-white px-4 py-2 rounded hover:bg-red-900 disabled:opacity-50 text-sm font-medium"
+           >
+             {loading ? 'Resetando...' : '🔄 Reset Completo'}
+           </button>
          </div>
       </div>
       
@@ -363,14 +634,23 @@ function WhatsAppSection() {
            
            {whatsappStatus === 'qr' && (
              <>
-               <h3 className="text-md font-medium mb-3">Escaneie o QR Code com seu WhatsApp:</h3>
+               <div className="flex items-center justify-between mb-3">
+                 <h3 className="text-md font-medium">📱 Escaneie o QR Code com seu WhatsApp:</h3>
+                 {qrRefreshInterval && (
+                   <div className="flex items-center gap-2 text-xs text-green-600">
+                     <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                     <span>Auto-refresh ativo (30s)</span>
+                   </div>
+                 )}
+               </div>
+               
                {qrCode ? (
-                 <div className="flex justify-center mb-3">
-                   <div className="border-2 border-gray-300 rounded-lg p-2 bg-white">
+                 <div className="text-center mb-4">
+                   <div className="inline-block border-4 border-green-200 rounded-xl p-3 bg-white shadow-lg">
                      <img 
                        src={qrCode} 
                        alt="QR Code WhatsApp" 
-                       className="max-w-xs w-64 h-64 object-contain" 
+                       className="w-64 h-64 object-contain" 
                        onLoad={() => console.log('✅ Imagem QR Code carregada com sucesso!')}
                        onError={(e) => {
                          console.error('❌ Erro ao carregar imagem do QR Code:', e);
@@ -379,61 +659,71 @@ function WhatsAppSection() {
                        }}
                      />
                    </div>
-                   <p className="text-xs text-center text-gray-500 mt-2">QR Code carregado: {qrCode ? 'Sim' : 'Não'}</p>
+                   <p className="text-xs text-gray-500 mt-2">QR Code atualizado automaticamente a cada 30 segundos</p>
                  </div>
                ) : (
-                 <div className="text-center mb-3">
-                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-yellow-600 mb-2"></div>
-                   <p className="text-sm text-gray-600">Aguardando QR Code...</p>
-                   <p className="text-xs text-gray-500 mt-1">Isso pode levar alguns segundos</p>
+                 <div className="text-center mb-4">
+                   <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-4 border-blue-600 mb-3"></div>
+                   <p className="text-sm text-gray-600 font-medium">Gerando QR Code...</p>
+                   <p className="text-xs text-gray-500 mt-1">Aguarde alguns segundos</p>
                  </div>
                )}
-               <p className="text-sm text-gray-600 text-center mb-3">
-                 1. Abra o WhatsApp no seu celular<br/>
-                 2. Vá em Configurações → Aparelhos conectados<br/>
-                 3. Toque em "Conectar um aparelho"<br/>
-                 4. Escaneie este QR Code
-               </p>
-               <div className="text-center">
+               
+               {/* Instruções passo-a-passo melhoradas */}
+               <div className="bg-blue-50 rounded-lg p-4 mb-4 border border-blue-200">
+                 <h4 className="text-sm font-semibold text-blue-800 mb-3">📋 Como conectar (passo-a-passo):</h4>
+                 <div className="space-y-2 text-sm text-blue-700">
+                   <div className="flex items-start gap-3">
+                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">1</span>
+                     <div>
+                       <strong>Abra o WhatsApp</strong> no seu celular
+                     </div>
+                   </div>
+                   <div className="flex items-start gap-3">
+                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">2</span>
+                     <div>
+                       Vá em <strong>Configurações</strong> → <strong>Aparelhos conectados</strong>
+                     </div>
+                   </div>
+                   <div className="flex items-start gap-3">
+                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">3</span>
+                     <div>
+                       Toque em <strong>"Conectar um aparelho"</strong>
+                     </div>
+                   </div>
+                   <div className="flex items-start gap-3">
+                     <span className="bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">4</span>
+                     <div>
+                       <strong>Escaneie o QR Code</strong> acima com a câmera do seu celular
+                     </div>
+                   </div>
+                 </div>
+               </div>
+               
+               <div className="flex gap-2 justify-center">
                  <button
-                   onClick={async () => {
-                     setQrCode(null); // Limpar QR code atual
-                     try {
-                       // Tentar buscar QR code via rota direta
-                       const qrResponse = await fetch('http://localhost:5000/qr/view', {
-                         method: 'GET',
-                         headers: {
-                           'Cache-Control': 'no-cache'
-                         }
-                       });
-                       
-                       if (qrResponse.ok) {
-                         const contentType = qrResponse.headers.get('content-type');
-                         if (contentType && contentType.includes('image')) {
-                           const qrBlob = await qrResponse.blob();
-                           const qrUrl = URL.createObjectURL(qrBlob);
-                           setQrCode(qrUrl);
-                           console.log('QR Code atualizado com sucesso!');
-                           return;
-                         }
-                       }
-                       
-                       // Se chegou aqui, tentar fallback
-                       const apiResponse = await api.get('/api/clientes/whatsapp/qr-code');
-                       if (apiResponse.data.success && apiResponse.data.qrCode) {
-                         setQrCode(`data:image/png;base64,${apiResponse.data.qrCode}`);
-                         console.log('QR Code carregado via API fallback');
-                       } else {
-                         alert('QR Code não disponível. Tente conectar novamente.');
-                       }
-                     } catch (err) {
-                       console.error('Erro ao buscar QR Code:', err);
-                       alert('Erro ao carregar QR Code: ' + (err.message || 'Erro desconhecido'));
+                   onClick={refreshQRCode}
+                   disabled={loading}
+                   className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50 text-sm"
+                 >
+                   🔄 Atualizar QR Code
+                 </button>
+                 
+                 <button
+                   onClick={() => {
+                     if (qrRefreshInterval) {
+                       stopQRAutoRefresh();
+                     } else {
+                       startQRAutoRefresh();
                      }
                    }}
-                   className="bg-yellow-600 text-white px-3 py-1 rounded hover:bg-yellow-700 text-sm"
+                   className={`px-4 py-2 rounded text-sm ${
+                     qrRefreshInterval 
+                       ? 'bg-red-600 text-white hover:bg-red-700' 
+                       : 'bg-green-600 text-white hover:bg-green-700'
+                   }`}
                  >
-                   Atualizar QR Code
+                   {qrRefreshInterval ? '⏹️ Parar Auto-refresh' : '▶️ Ativar Auto-refresh'}
                  </button>
                </div>
              </>

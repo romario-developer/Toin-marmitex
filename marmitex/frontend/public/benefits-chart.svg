@@ -1,0 +1,144 @@
+<svg width="400" height="300" viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="dashboardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f8f9fa;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="headerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E293B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#4caf50;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2e7d32;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="salesGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2196f3;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1565c0;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="ordersGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1D4ED8;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="timeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#D97706;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cardGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fafafa;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+    <filter id="cardShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.1"/>
+    </filter>
+    <filter id="chartShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="400" height="300" fill="url(#dashboardGradient)" rx="16"/>
+  
+  <!-- Dashboard Header -->
+  <rect x="10" y="10" width="380" height="45" fill="url(#headerGradient)" rx="10" filter="url(#shadow)"/>
+  <text x="20" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="15" font-weight="700" fill="white">📊 Dashboard Marmitaria</text>
+  <text x="20" y="42" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="rgba(255,255,255,0.8)">Relatório de Performance em Tempo Real</text>
+  <circle cx="360" cy="40" r="8" fill="#10B981"/>
+  <text x="360" y="44" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="white" text-anchor="middle">●</text>
+  
+  <!-- Metrics Cards Row -->
+  <!-- Sales Card -->
+  <g transform="translate(15, 65)">
+    <rect width="115" height="55" fill="url(#cardGradient)" rx="8" filter="url(#softShadow)"/>
+    <rect x="8" y="5" width="99" height="3" fill="url(#salesGradient)" rx="2"/>
+    <circle cx="20" cy="18" r="8" fill="url(#salesGradient)"/>
+    <text x="20" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="white" text-anchor="middle">💰</text>
+    <text x="35" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="600" fill="#374151">VENDAS</text>
+    <text x="12" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#2196f3">R$ 2.847</text>
+    <text x="12" y="47" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#6b7280">+23% hoje</text>
+  </g>
+  
+  <!-- Orders Card -->
+   <g transform="translate(140, 65)">
+     <rect width="115" height="55" fill="url(#cardGradient)" rx="8" filter="url(#softShadow)"/>
+     <rect x="8" y="5" width="99" height="3" fill="url(#ordersGradient)" rx="2"/>
+     <circle cx="20" cy="18" r="8" fill="url(#ordersGradient)"/>
+     <text x="20" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="white" text-anchor="middle">📦</text>
+     <text x="35" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="600" fill="#374151">PEDIDOS</text>
+     <text x="12" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#3b82f6">127</text>
+     <text x="12" y="47" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#6b7280">+12 hoje</text>
+   </g>
+  
+  <!-- Time Saved Card -->
+   <g transform="translate(265, 65)">
+     <rect width="115" height="55" fill="url(#cardGradient)" rx="8" filter="url(#softShadow)"/>
+     <rect x="8" y="5" width="99" height="3" fill="url(#timeGradient)" rx="2"/>
+     <circle cx="20" cy="18" r="8" fill="url(#timeGradient)"/>
+     <text x="20" y="22" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="white" text-anchor="middle">⏰</text>
+     <text x="35" y="16" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" font-weight="600" fill="#374151">TEMPO POUPADO</text>
+     <text x="12" y="35" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="700" fill="#f59e0b">8.5h</text>
+     <text x="12" y="47" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#6b7280">Automação ativa</text>
+   </g>
+  
+  <!-- Chart Area -->
+  <g transform="translate(15, 135)">
+    <rect width="240" height="110" fill="url(#cardGradient)" rx="10" filter="url(#softShadow)"/>
+    <text x="15" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#374151">📈 Crescimento de Vendas</text>
+    <text x="15" y="30" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#6b7280">Últimos 7 dias</text>
+    
+    <!-- Chart Bars -->
+    <g transform="translate(20, 40)">
+      <rect x="0" y="45" width="12" height="18" fill="url(#chartGradient)" rx="2"/>
+      <rect x="20" y="38" width="12" height="25" fill="url(#chartGradient)" rx="2"/>
+      <rect x="40" y="33" width="12" height="30" fill="url(#chartGradient)" rx="2"/>
+      <rect x="60" y="25" width="12" height="38" fill="url(#chartGradient)" rx="2"/>
+      <rect x="80" y="20" width="12" height="43" fill="url(#chartGradient)" rx="2"/>
+      <rect x="100" y="15" width="12" height="48" fill="url(#chartGradient)" rx="2"/>
+      <rect x="120" y="10" width="12" height="53" fill="url(#chartGradient)" rx="2"/>
+      
+      <!-- Chart Labels -->
+      <text x="6" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Seg</text>
+      <text x="26" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Ter</text>
+      <text x="46" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Qua</text>
+      <text x="66" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Qui</text>
+      <text x="86" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Sex</text>
+      <text x="106" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Sáb</text>
+      <text x="126" y="75" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="7" fill="#9ca3af" text-anchor="middle">Dom</text>
+    </g>
+  </g>
+  
+  <!-- Features List -->
+  <g transform="translate(270, 135)">
+    <rect width="110" height="110" fill="url(#cardGradient)" rx="10" filter="url(#softShadow)"/>
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#374151">🚀 Recursos Ativos</text>
+    
+    <g transform="translate(12, 28)">
+      <circle cx="4" cy="4" r="2.5" fill="#4caf50"/>
+      <text x="12" y="7" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Bot WhatsApp</text>
+      
+      <circle cx="4" cy="16" r="2.5" fill="#4caf50"/>
+      <text x="12" y="19" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">PIX Automático</text>
+      
+      <circle cx="4" cy="28" r="2.5" fill="#4caf50"/>
+      <text x="12" y="31" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Cardápio Digital</text>
+      
+      <circle cx="4" cy="40" r="2.5" fill="#f59e0b"/>
+      <text x="12" y="43" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Relatórios</text>
+      
+      <circle cx="4" cy="52" r="2.5" fill="#4caf50"/>
+      <text x="12" y="55" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Notificações</text>
+      
+      <circle cx="4" cy="64" r="2.5" fill="#4caf50"/>
+      <text x="12" y="67" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Backup Auto</text>
+      
+      <circle cx="4" cy="76" r="2.5" fill="#2196f3"/>
+      <text x="12" y="79" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="#374151">Analytics</text>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,133 @@
+<svg width="500" height="400" viewBox="0 0 500 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="phoneGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f5f5f5;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="whatsappGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#25d366;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#128c7e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="messageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#dcf8c6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c8e6c9;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="clientMessageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e3f2fd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#bbdefb;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.2"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background with subtle gradient -->
+  <rect width="500" height="400" fill="#ECE5DD" rx="16"/>
+  
+  <!-- Phone Frame -->
+  <rect x="10" y="10" width="480" height="380" fill="#FFFFFF" rx="20" stroke="#ddd" stroke-width="1" filter="url(#shadow)"/>
+  
+  <!-- WhatsApp Header -->
+  <rect x="10" y="10" width="480" height="75" fill="url(#whatsappGradient)" rx="20 20 0 0"/>
+  
+  <!-- Status Bar -->
+  <rect x="20" y="20" width="460" height="20" fill="rgba(255,255,255,0.1)" rx="10"/>
+  <text x="30" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="500" fill="white">9:41</text>
+  <text x="450" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="white" text-anchor="end">100%</text>
+  
+  <!-- Chat Header -->
+  <circle cx="50" cy="57" r="22" fill="#25D366" stroke="white" stroke-width="2"/>
+  <text x="50" y="62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="bold" fill="white" text-anchor="middle">🤖</text>
+  
+  <text x="82" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="600" fill="white">Marmitaria Bot</text>
+  <text x="82" y="67" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="rgba(255,255,255,0.8)">🟢 Online agora • Resposta automática</text>
+  
+  <!-- Chat Area Background -->
+  <rect x="10" y="80" width="480" height="280" fill="#E5DDD5"/>
+  
+  <!-- Customer Message 1 -->
+  <g transform="translate(260, 100)">
+    <rect width="210" height="32" fill="url(#clientMessageGradient)" rx="16" filter="url(#softShadow)"/>
+    <text x="10" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#1565c0">Oi! Quero fazer um pedido 😊</text>
+    <text x="195" y="28" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#999" text-anchor="end">14:30</text>
+  </g>
+  
+  <!-- Bot Response 1 -->
+  <g transform="translate(30, 145)">
+    <rect width="300" height="48" fill="url(#messageGradient)" rx="16" filter="url(#softShadow)"/>
+    <text x="15" y="17" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="500" fill="#2e7d32">🍽️ Olá! Bem-vindo à Marmitaria!</text>
+    <text x="15" y="33" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#2e7d32">Hoje temos: P(R$12) • M(R$15) • G(R$18)</text>
+    <text x="15" y="43" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#999">14:30</text>
+  </g>
+  
+  <!-- Menu Options -->
+  <g transform="translate(30, 205)">
+    <rect width="440" height="75" fill="#f8f9fa" rx="12" stroke="#e9ecef" stroke-width="1" filter="url(#softShadow)"/>
+    <text x="20" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#2e7d32">📋 CARDÁPIO DISPONÍVEL:</text>
+    
+    <g transform="translate(20, 28)">
+      <rect width="115" height="32" fill="white" rx="8" stroke="#25d366" stroke-width="1" filter="url(#softShadow)"/>
+      <text x="8" y="14" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#25d366">🍱 Marmita P</text>
+      <text x="8" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#666">R$ 12,00</text>
+    </g>
+    
+    <g transform="translate(155, 28)">
+      <rect width="115" height="32" fill="white" rx="8" stroke="#25d366" stroke-width="1" filter="url(#softShadow)"/>
+      <text x="8" y="14" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#25d366">🍱 Marmita M</text>
+      <text x="8" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#666">R$ 15,00</text>
+    </g>
+    
+    <g transform="translate(290, 28)">
+      <rect width="115" height="32" fill="white" rx="8" stroke="#25d366" stroke-width="1" filter="url(#softShadow)"/>
+      <text x="8" y="14" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="600" fill="#25d366">🍱 Marmita G</text>
+      <text x="8" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#666">R$ 18,00</text>
+    </g>
+  </g>
+  
+  <!-- Customer Selection -->
+  <g transform="translate(320, 295)">
+    <rect width="150" height="28" fill="url(#clientMessageGradient)" rx="14" filter="url(#softShadow)"/>
+    <text x="12" y="18" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#1565c0">Quero 1 Marmita M! 🍖</text>
+    <text x="135" y="25" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#999" text-anchor="end">14:31</text>
+  </g>
+  
+  <!-- Final Bot Response -->
+  <g transform="translate(30, 335)">
+    <rect width="350" height="55" fill="url(#messageGradient)" rx="16" filter="url(#softShadow)"/>
+    <text x="15" y="17" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#2e7d32">✅ Pedido Confirmado!</text>
+    <text x="15" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#2e7d32">🍖 1x Marmita M - R$ 15,00</text>
+    <text x="15" y="46" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#2e7d32">💳 PIX gerado! Entrega em 30min 🚚</text>
+    <text x="15" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9" fill="#999">14:31</text>
+  </g>
+  
+  <!-- Success Metrics -->
+  <g transform="translate(400, 90)">
+    <!-- Metric 1 -->
+    <circle cx="40" cy="20" r="30" fill="#4CAF50" filter="url(#shadow)"/>
+    <text x="40" y="12" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="white" text-anchor="middle">+300%</text>
+    <text x="40" y="24" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="500" fill="white" text-anchor="middle">VENDAS</text>
+    <text x="40" y="32" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" fill="white" text-anchor="middle">📈</text>
+    
+    <!-- Metric 2 -->
+    <circle cx="40" cy="80" r="30" fill="#FF5722" filter="url(#shadow)"/>
+    <text x="40" y="72" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="white" text-anchor="middle">-80%</text>
+    <text x="40" y="84" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="500" fill="white" text-anchor="middle">TEMPO</text>
+    <text x="40" y="92" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" fill="white" text-anchor="middle">⚡</text>
+    
+    <!-- Metric 3 -->
+    <circle cx="40" cy="140" r="30" fill="#2196F3" filter="url(#shadow)"/>
+    <text x="40" y="132" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" fill="white" text-anchor="middle">24/7</text>
+    <text x="40" y="144" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" font-weight="500" fill="white" text-anchor="middle">ONLINE</text>
+    <text x="40" y="152" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="6" fill="white" text-anchor="middle">🌐</text>
+  </g>
+  
+  <!-- Input Area -->
+  <rect x="10" y="360" width="480" height="30" fill="#F5F5F5" rx="0 0 20 20"/>
+  <rect x="20" y="368" width="400" height="14" fill="white" rx="7" stroke="#E0E0E0"/>
+  <text x="25" y="377" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" fill="#999">Digite sua mensagem...</text>
+  <circle cx="450" cy="375" r="8" fill="#25D366"/>
+  <text x="450" y="378" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="8" fill="white" text-anchor="middle">➤</text>
+</svg>
