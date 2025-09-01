@@ -341,7 +341,7 @@ class MultiTenantWhatsAppManager {
           // Aguardar um pouco para a instância se conectar
           console.log(`⏳ [AUTO-START] Aguardando conexão da instância...`);
           let attempts = 0;
-          const maxAttempts = 30; // 30 segundos
+          const maxAttempts = 60; // 60 segundos
           
           while (attempts < maxAttempts && (!instance || instance.status !== 'connected')) {
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -371,6 +371,9 @@ class MultiTenantWhatsAppManager {
       
       const telefone = message.from;
       const texto = message.body?.toLowerCase()?.trim() || '';
+      
+      console.log(`📱 [DEBUG] Número recebido: ${telefone}`);
+      console.log(`📱 [DEBUG] Texto da mensagem: "${texto}"`);
       
       // 🚫 Bloquear mensagens de status do WhatsApp
       if (telefone.includes('status@broadcast')) {
@@ -414,17 +417,27 @@ class MultiTenantWhatsAppManager {
   // Verificar se número é permitido para o cliente
   async isNumberAllowed(clienteId, telefone) {
     try {
-      // MODO TESTE: Apenas o número 73991472169 é permitido
       const numeroLimpo = telefone.replace('@c.us', '').replace(/\D/g, '');
-      const numeroTeste = '73991472169';
       
-      if (numeroLimpo.endsWith(numeroTeste)) {
-        console.log(`✅ Número de teste permitido: ${numeroLimpo}`);
+      // Verificar se está em MODO_TESTE
+      const modoTeste = process.env.MODO_TESTE === 'true';
+      
+      if (modoTeste) {
+        // MODO TESTE: Apenas o número 73991472169 é permitido
+        const numeroTeste = '73991472169';
+        
+        if (numeroLimpo.endsWith(numeroTeste)) {
+          console.log(`✅ [MODO_TESTE] Número de teste permitido: ${numeroLimpo}`);
+          return true;
+        }
+        
+        console.log(`🚫 [MODO_TESTE] Número bloqueado: ${numeroLimpo} (apenas ${numeroTeste} é permitido)`);
+        return false;
+      } else {
+        // MODO PRODUÇÃO: Todos os números são permitidos
+        console.log(`✅ [MODO_PRODUÇÃO] Número permitido: ${numeroLimpo}`);
         return true;
       }
-      
-      console.log(`🚫 Número bloqueado para teste: ${numeroLimpo} (apenas ${numeroTeste} é permitido)`);
-      return false;
       
     } catch (error) {
       console.error('❌ Erro ao verificar número permitido:', error);
@@ -489,16 +502,25 @@ class MultiTenantWhatsAppManager {
   async sendMessage(clienteId, telefone, mensagem) {
     try {
       const instance = this.clienteInstances.get(clienteId);
+      
+      console.log(`🔍 [SEND_MESSAGE] Cliente: ${clienteId}`);
+      console.log(`🔍 [SEND_MESSAGE] Instância existe: ${!!instance}`);
+      console.log(`🔍 [SEND_MESSAGE] Status: ${instance?.status || 'N/A'}`);
+      console.log(`🔍 [SEND_MESSAGE] Cliente WPP: ${!!instance?.client}`);
+      
       if (!instance || !instance.client || instance.status !== 'connected') {
-        console.log(`⚠️ Cliente ${clienteId} não conectado`);
+        console.log(`⚠️ [SEND_MESSAGE] Cliente ${clienteId} não conectado - Status: ${instance?.status || 'N/A'}`);
+        console.log(`⚠️ [SEND_MESSAGE] Mensagem não enviada: "${mensagem.substring(0, 50)}..."`);
         return false;
       }
       
+      console.log(`✅ [SEND_MESSAGE] Enviando mensagem para ${telefone}`);
       await instance.client.sendText(telefone, mensagem);
+      console.log(`✅ [SEND_MESSAGE] Mensagem enviada com sucesso`);
       return true;
       
     } catch (error) {
-      console.error(`❌ Erro ao enviar mensagem para cliente ${clienteId}:`, error);
+      console.error(`❌ [SEND_MESSAGE] Erro ao enviar mensagem para cliente ${clienteId}:`, error);
       return false;
     }
   }

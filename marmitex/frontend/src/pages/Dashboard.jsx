@@ -70,9 +70,13 @@ const Dashboard = () => {
         }
       });
       
+      // Usar o status mais preciso baseado na verificação real da instância
+      const isConnected = whatsappResponse.data.whatsapp.isConnected || 
+                         whatsappResponse.data.whatsapp.statusConexao === 'connected';
+      
       setStats(prev => ({ 
         ...prev, 
-        whatsappStatus: whatsappResponse.data.whatsapp.isConnected ? 'connected' : 'disconnected'
+        whatsappStatus: isConnected ? 'connected' : 'disconnected'
       }));
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);

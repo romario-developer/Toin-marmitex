@@ -56,7 +56,12 @@ function WhatsAppSection() {
     // Escutar eventos do WhatsApp em tempo real
     newSocket.on('qr_code', (data) => {
       console.log('📱 [DEBUG] QR Code recebido via WebSocket:', data);
-      console.log('📱 QR Code recebido via WebSocket:', data);
+      
+      // Verificar se já temos um QR code para evitar duplicação
+      if (qrCode && whatsappStatus === 'qr') {
+        console.log('⚠️ QR Code já existe, ignorando novo QR via WebSocket');
+        return;
+      }
       
       // Verificar se o QR Code já tem o prefixo data:image/png;base64,
       const qrCodeUrl = data.qrCode.startsWith('data:image/png;base64,') 
@@ -73,7 +78,6 @@ function WhatsAppSection() {
 
     newSocket.on('whatsapp_connected', (data) => {
       console.log('✅ [DEBUG] WhatsApp conectado via WebSocket:', data);
-      console.log('✅ WhatsApp conectado via WebSocket:', data);
       setWhatsappStatus('connected');
       setQrCode(null);
       setRealTimeStatus('WhatsApp conectado com sucesso!');
@@ -84,7 +88,6 @@ function WhatsAppSection() {
 
     newSocket.on('whatsapp_disconnected', (data) => {
       console.log('❌ [DEBUG] WhatsApp desconectado via WebSocket:', data);
-      console.log('❌ WhatsApp desconectado via WebSocket:', data);
       setWhatsappStatus('disconnected');
       setQrCode(null);
       setRealTimeStatus('WhatsApp desconectado');
@@ -141,67 +144,72 @@ function WhatsAppSection() {
    }, [whatsappStatus]);
  
    const connectWhatsApp = async () => {
-     // Prevenir múltiplas chamadas simultâneas
-     if (isConnecting || loading) {
-       console.log('⚠️ Conexão já em andamento, ignorando nova tentativa');
-       return;
-     }
+    // Prevenir múltiplas chamadas simultâneas
+    if (isConnecting || loading) {
+      console.log('⚠️ Conexão já em andamento, ignorando nova tentativa');
+      return;
+    }
 
-     setLoading(true);
-     setIsConnecting(true);
-     try {
-       setWhatsappStatus('connecting');
-       console.log('🔄 Iniciando conexão WhatsApp...');
-       
-       const { data } = await api.post('/api/clientes/whatsapp/conectar');
-       
-       if (data.success) {
-         console.log('🚀 Conexão WhatsApp iniciada com sucesso');
-         
-         // Salvar informações da sessão
-         if (data.sessionInfo) {
-           setSessionInfo(data.sessionInfo);
-           console.log('📁 Informações da sessão:', data.sessionInfo);
-         }
-         
-         // Se tem sessão salva válida, aguardar mais tempo antes de buscar QR
-         if (data.sessionInfo?.hasSavedSession && !data.sessionInfo?.sessionExpired) {
-           console.log('🔑 Aguardando reconexão automática...');
-           // Aguardar 10 segundos para reconexão automática
-           setTimeout(() => {
-             checkStatus(true); // Forçar verificação de status
-           }, 10000);
-           
-           // Se não conectar em 15 segundos, iniciar polling do QR
-           setTimeout(() => {
-             if (whatsappStatus !== 'connected') {
-               console.log('⏰ Reconexão automática falhou, iniciando QR code...');
-               pollForQRCode();
-             }
-           }, 15000);
-         } else {
-           // Sem sessão salva ou expirada - iniciar QR imediatamente
-           pollForQRCode();
-           
-           // Verificar status após 5 segundos
-           setTimeout(() => {
-             checkStatus();
-           }, 5000);
-         }
-       } else {
-         console.error('❌ Erro na resposta do servidor:', data);
-         alert('Erro ao conectar: ' + data.message);
-         setWhatsappStatus('disconnected');
-       }
-     } catch (error) {
-       console.error('❌ Erro ao conectar WhatsApp:', error);
-       alert('Erro ao conectar WhatsApp: ' + (error.response?.data?.message || error.message));
-       setWhatsappStatus('disconnected');
-     } finally {
-       setLoading(false);
-       setIsConnecting(false);
-     }
-   };
+    setLoading(true);
+    setIsConnecting(true);
+    setQrCode(null); // Limpar QR code anterior
+    
+    try {
+      setWhatsappStatus('connecting');
+      console.log('🔄 Iniciando conexão WhatsApp...');
+      
+      const { data } = await api.post('/api/clientes/whatsapp/conectar');
+      
+      if (data.success) {
+        console.log('🚀 Conexão WhatsApp iniciada com sucesso');
+        
+        // Salvar informações da sessão
+        if (data.sessionInfo) {
+          setSessionInfo(data.sessionInfo);
+          console.log('📁 Informações da sessão:', data.sessionInfo);
+        }
+        
+        // Se tem sessão salva válida, aguardar reconexão automática
+        if (data.sessionInfo?.hasSavedSession && !data.sessionInfo?.sessionExpired) {
+          console.log('🔑 Aguardando reconexão automática...');
+          setWhatsappStatus('connecting');
+          
+          // Aguardar 15 segundos para reconexão automática
+          setTimeout(() => {
+            checkStatus(true); // Forçar verificação de status
+            
+            // Se ainda não conectou após verificação, iniciar QR
+            setTimeout(() => {
+              if (whatsappStatus !== 'connected') {
+                console.log('⏰ Reconexão automática falhou, iniciando QR code...');
+                pollForQRCode();
+              }
+            }, 3000);
+          }, 15000);
+        } else {
+          // Sem sessão salva ou expirada - aguardar um pouco antes do QR
+          console.log('📱 Aguardando geração do QR code...');
+          setWhatsappStatus('qr');
+          
+          // Aguardar 3 segundos antes de buscar QR para evitar duplicação
+          setTimeout(() => {
+            pollForQRCode();
+          }, 3000);
+        }
+      } else {
+        console.error('❌ Erro na resposta do servidor:', data);
+        alert('Erro ao conectar: ' + data.message);
+        setWhatsappStatus('disconnected');
+      }
+    } catch (error) {
+      console.error('❌ Erro ao conectar WhatsApp:', error);
+      alert('Erro ao conectar WhatsApp: ' + (error.response?.data?.message || error.message));
+      setWhatsappStatus('disconnected');
+    } finally {
+      setLoading(false);
+      setIsConnecting(false);
+    }
+  };
 
    const refreshQRCode = async () => {
      try {
@@ -274,38 +282,46 @@ function WhatsAppSection() {
    };
 
    const pollForQRCode = async () => {
-     let attempts = 0;
-     const maxAttempts = 20; // 20 tentativas (60 segundos)
-     let qrFound = false;
-     
-     // Definir status como 'qr' imediatamente para mostrar a área de QR code
-     setWhatsappStatus('qr');
-     setQrCode(null); // Limpar QR code anterior
-     
-     console.log('🔄 Iniciando polling para QR code...');
-     
-     const poll = async () => {
-       if (qrFound) return; // Parar se QR já foi encontrado
-       
-       const success = await refreshQRCode();
-       if (success) {
-         qrFound = true;
-         startQRAutoRefresh(); // Iniciar auto-refresh quando QR for encontrado
-         return;
-       }
-       
-       attempts++;
-       if (attempts < maxAttempts && !qrFound) {
-         setTimeout(poll, 3000); // Tentar novamente em 3 segundos
-       } else {
-         console.log('⏰ Timeout ao aguardar QR code');
-         alert('Não foi possível carregar o QR Code. Tente conectar novamente.');
-       }
-     };
-     
-     // Começar o polling imediatamente
-     poll();
-   };
+    // Verificar se já está buscando QR code para evitar duplicação
+    if (qrCode || whatsappStatus === 'connected') {
+      console.log('⚠️ QR code já existe ou WhatsApp já conectado, ignorando polling');
+      return;
+    }
+    
+    let attempts = 0;
+    const maxAttempts = 15; // 15 tentativas (45 segundos)
+    let qrFound = false;
+    
+    console.log('🔄 Iniciando polling para QR code...');
+    
+    const poll = async () => {
+      // Verificar se ainda precisa do QR code
+      if (qrFound || whatsappStatus === 'connected') {
+        console.log('✅ Polling interrompido - QR encontrado ou WhatsApp conectado');
+        return;
+      }
+      
+      const success = await refreshQRCode();
+      if (success) {
+        qrFound = true;
+        console.log('✅ QR Code encontrado, iniciando auto-refresh');
+        startQRAutoRefresh();
+        return;
+      }
+      
+      attempts++;
+      if (attempts < maxAttempts && !qrFound && whatsappStatus !== 'connected') {
+        setTimeout(poll, 3000); // Tentar novamente em 3 segundos
+      } else if (attempts >= maxAttempts) {
+        console.log('⏰ Timeout ao aguardar QR code');
+        setWhatsappStatus('disconnected');
+        alert('Não foi possível carregar o QR Code. Tente conectar novamente.');
+      }
+    };
+    
+    // Começar o polling imediatamente
+    poll();
+  };
  
    const resetCompleto = async () => {
      if (!confirm('Tem certeza que deseja fazer um reset completo? Isso irá limpar todos os dados de sessão e você precisará escanear o QR code novamente.')) {

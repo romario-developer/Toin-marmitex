@@ -181,12 +181,17 @@ export const getStatusWhatsApp = async (req, res) => {
     const instanciaLocal = clienteInstances.get(clienteId);
     console.log(`🔍 [DEBUG] Instância local encontrada: ${!!instanciaLocal}`);
     
+    // Verificar se realmente está conectado
+    const isReallyConnected = multiTenantManager.isClientConnected(clienteId);
+    console.log(`🔍 [DEBUG] Status real da conexão: ${isReallyConnected}`);
+    
     const statusResponse = {
       sucesso: true,
       whatsapp: {
         numeroTelefone: cliente.whatsapp.numeroTelefone,
         nomeSessao: cliente.whatsapp.nomeSessao,
         statusConexao: cliente.whatsapp.statusConexao,
+        isConnected: isReallyConnected, // Adicionar campo para compatibilidade com Dashboard
         ultimaConexao: cliente.whatsapp.ultimaConexao,
         qrCode: cliente.whatsapp.qrCode,
         ultimoErro: cliente.whatsapp.ultimoErro,

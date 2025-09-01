@@ -276,7 +276,7 @@ const Planos = () => {
       {/* Grid de Planos */}
       <Grid container spacing={4} justifyContent="center">
         {planos.length === 0 && !loading && (
-          <Grid item xs={12}>
+          <Grid size={12}>
             <Alert severity="info">
               Nenhum plano disponível no momento.
             </Alert>
@@ -287,7 +287,7 @@ const Planos = () => {
           const isPopular = plano.tipo === 'profissional';
           
           return (
-            <Grid item xs={12} md={4} key={plano._id}>
+            <Grid size={{ xs: 12, md: 4 }} key={plano._id}>
               <Card 
                 sx={{ 
                   height: '100%',

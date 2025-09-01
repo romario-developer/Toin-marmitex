@@ -124,7 +124,7 @@ const PlanoInfo = () => {
 
         <Grid container spacing={3}>
           {/* Informações do Plano */}
-          <Grid item xs={12} md={4}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 'bold', mb: 1 }}>
                 {plano.nome}
@@ -147,7 +147,7 @@ const PlanoInfo = () => {
           </Grid>
 
           {/* Uso de Recursos */}
-          <Grid item xs={12} md={8}>
+          <Grid size={{ xs: 12, md: 8 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
               Uso de Recursos
             </Typography>

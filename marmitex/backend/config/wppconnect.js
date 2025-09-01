@@ -216,7 +216,7 @@ export async function initWpp(sessionId = 'marmitex-bot', options = {}) {
       updatesLog: false,
       // Timeout para QR Code mais generoso
       timeout: 300000, // 5 minutos
-      autoClose: 300000, // 5 minutos para auto close
+      autoClose: process.env.WPP_AUTO_CLOSE === 'false' ? 0 : 300000, // Desabilitar auto close se WPP_AUTO_CLOSE=false
       logQR: false, // Desabilitar log QR no console para evitar spam
       // Configurações de QR Code otimizadas
       catchQR: (base64Qr, asciiQR, attempts, urlCode) => {
